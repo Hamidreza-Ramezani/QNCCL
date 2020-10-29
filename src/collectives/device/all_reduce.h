@@ -10,7 +10,6 @@
 #include "cuda_runtime.h"
 #include "cuda.h"
 #include <stdio.h>
-static __device__ int count2 = 0;
 
 
 template<int UNROLL, class FUNC, typename T>
@@ -28,19 +27,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
 
-  //printf("hello World1 \n");
-  //atomicAdd(&count2, 1);
-  //printf("count2: %d \n", count2);
- 
-
-
-
-  //int a = sizeof(struct ncclColl);
-  //int b = 0x10*sizeof(int);
-  //printf("the size of ncclColl is:  %d  \n",a);
-  //printf("the size of ncclColl must be: %d  \n",b);
- 
-
   // Compute pointers
   const T * __restrict__ thisInput = (const T*)args->sendbuff;
   T * __restrict__ thisOutput = (T*)args->recvbuff;
@@ -48,6 +34,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 
   ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
     prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+  //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, float, 1, 1, 1, FUNC>
+  //  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
   for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
     ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
@@ -76,6 +64,7 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       
       //__syncthreads();
       T* __restrict__ temp = (T*)args->tempbuff1;
+      //float* __restrict__ temp = (float*)args->tempbuff1;
       //__syncthreads();
       prims.recv(temp + offset , nelem);
       //__syncthreads();
@@ -106,6 +95,7 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     prims.copySend(temp + offset, thisOutput+offset, nelem);
 */
     T* __restrict__ temp2 = (T*)args->tempbuff2;
+    //float* __restrict__ temp2 = (float*)args->tempbuff2;
     //__syncthreads();
     prims.directRecv(temp2 + offset , offset, nelem);
     //__syncthreads();
@@ -136,6 +126,81 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     prims.directRecv(thisOutput+offset, offset, nelem);
   }
 }
+
+
+template<int UNROLL, class FUNC, typename T>
+__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
+  const int tid = threadIdx.x;
+  const int nthreads = args->coll.nThreads-WARP_SIZE;
+  const int bid = args->coll.bid;
+  const int nChannels = args->coll.nChannels;
+  struct ncclDevComm* comm = args->comm;
+  struct ncclChannel* channel = comm->channels+blockIdx.x;
+  struct ncclRing* ring = &channel->ring;
+  const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / (sizeof(T)*NCCL_STEPS);
+  const int chunkSize = stepSize * ALLREDUCE_CHUNKSTEPS;
+  const int nranks = comm->nRanks;
+  const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
+  const ssize_t size = args->coll.count;
+
+  // Compute pointers
+  const T * __restrict__ thisInput = (const T*)args->sendbuff;
+  T * __restrict__ thisOutput = (T*)args->recvbuff;
+
+  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
+    prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+
+  for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
+    ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
+    ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
+    ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
+
+    /////////////// begin AllReduce steps ///////////////
+    ssize_t offset;
+    int nelem;
+    int chunk;
+
+    // step 0: push data to next GPU
+    chunk = ring->devUserRanks[nranks-1];
+    offset = chunkOffset + chunk * realChunkSize;
+    nelem = min(realChunkSize, size-offset);
+
+    prims.send(thisInput+offset, nelem);
+    for (int j=2; j<nranks; ++j) {
+      chunk = ring->devUserRanks[nranks-j];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+      
+      prims.recvReduceSend(thisInput+offset, nelem);
+    }
+
+    // step k-1: reduce this buffer and data, which will produce the final
+    // result that we store in this data and push to the next GPU
+    chunk = ring->devUserRanks[0];
+    offset = chunkOffset + chunk * realChunkSize;
+    nelem = min(realChunkSize, size-offset);
+
+    prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
+
+    // k-2 steps: copy to next GPU
+    for (int j=1; j<nranks-1; ++j) {
+      chunk = ring->devUserRanks[nranks-j];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+
+      prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+    }
+
+    // Make final copy from buffer to dest.
+    chunk = ring->devUserRanks[1];
+    offset = chunkOffset + chunk * realChunkSize;
+    nelem = min(realChunkSize, size-offset);
+
+    // Final wait/copy.
+    prims.directRecv(thisOutput+offset, offset, nelem);
+  }
+}
+
 
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {

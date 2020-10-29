@@ -1,8 +1,6 @@
 #!/usr/bash
 
 
-
-#hello world!
 make clean
 export DEBUG=1
 #export NCCL_DEBUG=INFO
