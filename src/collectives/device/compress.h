@@ -5,17 +5,17 @@
 #include "cuda.h"
 
 
-template<typename T>
-__device__ int compress(T* inputArray) {
-
-  return 0;
-}
-
-
-//int hello(){
+//template<typename T>
+//__device__ int compress(T* inputArray) {
 //
 //  return 0;
 //}
+
+
+int hello(){
+
+  return 0;
+}
 
 
 //template<>
