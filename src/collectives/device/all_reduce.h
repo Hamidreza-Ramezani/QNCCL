@@ -60,8 +60,11 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     //prims(compressedInput+offset, nelem)
     //compress(thisInput);
 
-    //int a = compress<T>(thisOutput);
-    //printf("a is: %d \n", a);
+    //if (threadIdx.x == 0 && gridOffset == 0) {
+    //  int a = compress<T>(thisOutput);
+    //  int b = compress<T>(thisInput);
+    //  printf("a is: %d and b is: %d \n", a, b);
+    //}
 
     prims.send(thisInput+offset, nelem);
     // k-2 steps: reduce and copy to next GPU
