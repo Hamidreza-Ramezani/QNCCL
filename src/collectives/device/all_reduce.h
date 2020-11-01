@@ -10,7 +10,10 @@
 #include "cuda_runtime.h"
 #include "cuda.h"
 #include <stdio.h>
+#include <compress.h>
 
+//template<int UNROLL, class FUNC, typename T> __device__ int compress(T* inputArray);
+//template<int UNROLL, class FUNC, typename T> __device__ int compress<4, FuncSum<float>, float>(float* inputArray);
 
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
@@ -43,7 +46,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
     
 
-
     /////////////// begin AllReduce steps ///////////////
     ssize_t offset;
     int nelem;
@@ -54,28 +56,27 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
 
+    //I need to compress thisInput+offset ... nelem 
+    //prims(compressedInput+offset, nelem)
+    //compress(thisInput);
+
+    //int a = compress<T>(thisOutput);
+    //printf("a is: %d \n", a);
+
     prims.send(thisInput+offset, nelem);
-    //printf("hello world11");
     // k-2 steps: reduce and copy to next GPU
     for (int j=2; j<nranks; ++j) {
       chunk = ring->devUserRanks[nranks-j];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
       
-      //__syncthreads();
       T* __restrict__ temp = (T*)args->tempbuff1;
       //float* __restrict__ temp = (float*)args->tempbuff1;
-      //__syncthreads();
       prims.recv(temp + offset , nelem);
-      //__syncthreads();
-      //for (int idx = offset+tid; idx < offset+nelem; idx += nthreads) {
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
         temp[idx] = FUNC()(temp[idx], thisInput[idx]);
       }
-      //__syncthreads();
       prims.send(temp + offset, nelem);
-      //__syncthreads();
-
 
       //prims.recvReduceSend(thisInput+offset, nelem);
     }
@@ -86,25 +87,14 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     chunk = ring->devUserRanks[0];
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
-/*
-    T* __restrict__ temp = new T[size];
-    prims.directRecv(temp + offset , offset, nelem);
-    for (int i=0; i < nelem; ++i){
-       temp[offset + i] = FUNC()(thisInput[offset +i], temp[offset +i]);
-    }
-    prims.copySend(temp + offset, thisOutput+offset, nelem);
-*/
+
     T* __restrict__ temp2 = (T*)args->tempbuff2;
     //float* __restrict__ temp2 = (float*)args->tempbuff2;
-    //__syncthreads();
     prims.directRecv(temp2 + offset , offset, nelem);
-    //__syncthreads();
     for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
       temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
     }
-    //__syncthreads();
     prims.copySend(temp2 + offset, thisOutput+offset, nelem);
-    //__syncthreads();
 
     //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
@@ -127,6 +117,18 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   }
 }
 
+//template<int UNROLL, class FUNC, typename T>
+//__device__ int compress(T* inputArray) {
+//
+//  return 0;
+//}
+//
+//
+//template<int UNROLL, class FUNC, typename T>
+//__device__ int compress<4, FuncSum<float>, float>(float* inputArray) {
+//
+//  return 1;
+//}
 
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
