@@ -13,7 +13,7 @@ __device__ int* compress(T* dst, int* compressedDst, int nelem) {
 
 
 template<typename T>
-__device__ int* compress(const T* src, int* compressedSrc, int nelem) {
+__device__ const int* compress(const T* src, const int* compressedSrc, int nelem) {
 
   return compressedSrc;
 }
@@ -27,7 +27,7 @@ inline __device__ int* compress<float>(float* dst, int* compressedDst, int nelem
 
 
 template<>
-inline __device__ int* compress<float>(const float* src, int* compressedSrc, int nelem) {
+inline __device__ const int* compress<float>(const float* src, const int* compressedSrc, int nelem) {
 
   return compressedSrc;
 }

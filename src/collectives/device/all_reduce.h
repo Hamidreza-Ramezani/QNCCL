@@ -33,7 +33,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   // Compute pointers
   const T * __restrict__ thisInput = (const T*)args->sendbuff;
   T * __restrict__ thisOutput = (T*)args->recvbuff;
-  //T* __restrict__ temp = (T*)args->tempbuff;
 
   ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
     prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
@@ -56,15 +55,16 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
 
+    const int* __restrict__ compressedbuff1 = (const int*)args->compressedbuff1;
+
     //I need to compress thisInput+offset ... nelem 
     //prims(compressedInput+offset, nelem)
     //compress(thisInput);
 
-    //if (threadIdx.x == 0 && gridOffset == 0) {
-    //  int* a = compress<T>(thisOutput);
-    //  int* b = compress<T>(thisInput);
-    //  printf("a is: %d and b is: %d \n", *a, *b);
-    //}
+    if (threadIdx.x == 0 && gridOffset == 0) {
+      compressedbuff1 = compress<T>(thisInput, compressedbuff1, nelem);
+      //printf("the compression is done \n");
+    }
 
     prims.send(thisInput+offset, nelem);
     // k-2 steps: reduce and copy to next GPU
@@ -74,7 +74,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       nelem = min(realChunkSize, size-offset);
       
       T* __restrict__ temp = (T*)args->tempbuff1;
-      //float* __restrict__ temp = (float*)args->tempbuff1;
       prims.recv(temp + offset , nelem);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
         temp[idx] = FUNC()(temp[idx], thisInput[idx]);
@@ -92,7 +91,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     nelem = min(realChunkSize, size-offset);
 
     T* __restrict__ temp2 = (T*)args->tempbuff2;
-    //float* __restrict__ temp2 = (float*)args->tempbuff2;
     prims.directRecv(temp2 + offset , offset, nelem);
     for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
       temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);

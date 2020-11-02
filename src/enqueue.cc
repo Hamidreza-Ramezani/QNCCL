@@ -363,6 +363,11 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.recvbuff = info->recvbuff;
   coll->args.tempbuff1 = info->tempbuff1;
   coll->args.tempbuff2 = info->tempbuff2;
+  coll->args.compressedbuff1 = info->compressedbuff1;
+  coll->args.compressedbuff2 = info->compressedbuff2;
+
+
+
   //cudaSetDevice(info->comm->cudaDev);
   //void** tempbuff_ptr1 = &(coll->args.tempbuff1);
   //void** tempbuff_ptr2 = &(coll->args.tempbuff2);
@@ -609,6 +614,8 @@ end:
     NCCLCHECK(ncclEnqueueEvents(info->comm));
     CUDACHECK(cudaFree(info->tempbuff1));
     CUDACHECK(cudaFree(info->tempbuff2));
+    CUDACHECK(cudaFree((void*)info->compressedbuff1));
+    CUDACHECK(cudaFree(info->compressedbuff2));
     return ncclSuccess;
   }
 }

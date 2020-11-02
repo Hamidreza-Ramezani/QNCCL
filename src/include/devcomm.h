@@ -141,7 +141,9 @@ struct CollectiveArgs {
   void * recvbuff;
   void * tempbuff1;
   void * tempbuff2;
-  //int dummy[14]; 
+  const void * compressedbuff1;
+  void * compressedbuff2;
+  //int dummy[10];
 
 
   // Op-specific fields. Make sure the common part stays the
@@ -177,9 +179,8 @@ struct ncclColl {
     };
     int data[0x10];
   };
-  int dummy[14]; 
 };
-static_assert(sizeof(struct ncclColl) == (0x20*sizeof(int)), "ncclColl must have a pow2 size");
+//static_assert(sizeof(struct ncclColl) == (0x20*sizeof(int)), "ncclColl must have a pow2 size");
 
 struct ncclChannel {
   union {
