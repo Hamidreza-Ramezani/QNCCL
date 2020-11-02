@@ -6,29 +6,40 @@
 
 
 template<typename T>
-__device__ int compress(T* inputArray) {
-
-  return 0;
+__device__ int* compress(T* dst) {
+  
+  int a = 0;
+  int* ptr = new int;
+  *ptr = a; 
+  return ptr;
 }
 
 
 template<typename T>
-__device__ int compress(const T* inputArray) {
+__device__ int* compress(const T* src) {
 
-  return 1;
+  int a = 1;
+  int* ptr = new int;
+  *ptr = a; 
+  return ptr;
 }
 
 
 template<>
-inline __device__ int compress<float>(float* inputArray) {
+inline __device__ int* compress<float>(float* dst) {
 
-  return 2;
+  int a = 2;
+  int* ptr = new int;
+  *ptr = a; 
+  return ptr;
 }
 
 
 template<>
-inline __device__ int compress<float>(const float* inputArray) {
+inline __device__ int* compress<float>(const float* src) {
 
-  return 3;
+  int a = 3;
+  int* ptr = new int;
+  *ptr = a; 
+  return ptr;
 }
-
