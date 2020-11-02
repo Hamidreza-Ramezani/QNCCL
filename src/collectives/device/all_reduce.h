@@ -37,7 +37,7 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 
   ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
     prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
-  //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, float, 1, 1, 1, FUNC>
+  //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int, 1, 1, 1, FUNC>
   //  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
   for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
@@ -60,11 +60,11 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     //prims(compressedInput+offset, nelem)
     //compress(thisInput);
 
-    if (threadIdx.x == 0 && gridOffset == 0) {
-      int* a = compress<T>(thisOutput);
-      int* b = compress<T>(thisInput);
-      printf("a is: %d and b is: %d \n", *a, *b);
-    }
+    //if (threadIdx.x == 0 && gridOffset == 0) {
+    //  int* a = compress<T>(thisOutput);
+    //  int* b = compress<T>(thisInput);
+    //  printf("a is: %d and b is: %d \n", *a, *b);
+    //}
 
     prims.send(thisInput+offset, nelem);
     // k-2 steps: reduce and copy to next GPU
