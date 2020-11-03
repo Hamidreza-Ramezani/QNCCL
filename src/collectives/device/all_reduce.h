@@ -32,10 +32,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   const T * __restrict__ thisInput = (const T*)args->sendbuff;
   T * __restrict__ thisOutput = (T*)args->recvbuff;
 
-  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
-    prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
-  //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int, 1, 1, 1, FUNC>
+  //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
   //  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int, 1, 1, 1, FUNC>
+    prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
   for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
     ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
@@ -54,18 +54,21 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     nelem = min(realChunkSize, size-offset);
 
     const int* __restrict__ compressedbuff1 = (const int*)args->compressedbuff1;
+    int* __restrict__ compressedbuff2 = (int*)args->compressedbuff2;
 
     //I need to compress thisInput+offset ... nelem 
     //prims(compressedInput+offset, nelem)
     //compress(thisInput);
 
-    if (threadIdx.x == 0 && gridOffset == 0) {
-      compressedbuff1 = compress<T>(thisInput, compressedbuff1, nelem);
-      //printf("the compression is done \n");
-    }
+    //if (threadIdx.x == 0 && gridOffset == 0) {
+    //  compressedbuff1 = compress<T>(thisInput, compressedbuff1, nelem);
+    //  //printf("the compression is done \n");
+    //}
 
-    //prims.send(thisInput+offset, nelem);
+    compressedbuff1 = compress<T>(thisInput, compressedbuff1, nelem);
     prims.send(compressedbuff1+offset, nelem);
+    //prims.send(thisInput+offset, nelem);
+
     // k-2 steps: reduce and copy to next GPU
     for (int j=2; j<nranks; ++j) {
       chunk = ring->devUserRanks[nranks-j];
@@ -73,13 +76,17 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       nelem = min(realChunkSize, size-offset);
 
       int* __restrict__ temp = (int*)args->tempbuff1;
+      //T* __restrict__ temp = (T*)args->tempbuff1;
       prims.recv(temp + offset , nelem);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+        //temp[idx] = FUNC()(temp[idx], thisInput[idx]);
         temp[idx] = FUNC()((T*)temp[idx], thisInput[idx]);
         compressedbuff2 = compress<T>(temp, compressedbuff2, nelem);
       }
       //prims.send(temp + offset, nelem);
       prims.send(compressedbuff2+offset, nelem);
+
+
 
       //prims.recvReduceSend(thisInput+offset, nelem);
     }
@@ -92,13 +99,23 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     nelem = min(realChunkSize, size-offset);
 
     int* __restrict__ temp2 = (int*)args->tempbuff2;
+    //T* __restrict__ temp2 = (T*)args->tempbuff2;
     prims.directRecv(temp2 + offset , offset, nelem);
     for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+      //temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
       temp2[idx] = FUNC()(thisInput[idx], (T*)temp2[idx]);
       compressedbuff2 = compress<T>(temp2, compressedbuff2, nelem);
     }
+    for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+      thisOutput[idx] = (T*)temp2[idx];
+      //thisOutput[idx] = temp2[idx];
+    }
+    prims.send(compressedbuff2 + offset, nelem);
+    //prims.send(temp2 + offset, nelem);
     //prims.copySend(temp2 + offset, thisOutput+offset, nelem);
-    prims.copySend(compressedbuff2+offset, thisOutput+offset, nelem);
+
+
+
 
     //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
