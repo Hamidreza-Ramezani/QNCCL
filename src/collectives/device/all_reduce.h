@@ -98,16 +98,16 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
 
-    int* __restrict__ temp2 = (int*)args->tempbuff2;
+    int* __restrict__ temp = (int*)args->tempbuff1;
     //T* __restrict__ temp2 = (T*)args->tempbuff2;
-    prims.directRecv(temp2 + offset , offset, nelem);
+    prims.directRecv(temp + offset , offset, nelem);
     for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
       //temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
-      temp2[idx] = FUNC()(thisInput[idx], (T*)temp2[idx]);
-      compressedbuff2 = compress<T>(temp2, compressedbuff2, nelem);
+      temp[idx] = FUNC()(thisInput[idx], (T*)temp[idx]);
+      compressedbuff2 = compress<T>(temp, compressedbuff2, nelem);
     }
     for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
-      thisOutput[idx] = (T*)temp2[idx];
+      thisOutput[idx] = (T*)temp[idx];
       //thisOutput[idx] = temp2[idx];
     }
     prims.send(compressedbuff2 + offset, nelem);

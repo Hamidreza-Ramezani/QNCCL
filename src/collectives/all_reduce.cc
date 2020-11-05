@@ -23,10 +23,10 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   void** compressedbuff_ptr2 = &compressedbuff2;
   cudaMalloc(tempbuff_ptr1, nbytes);
   cudaMalloc(tempbuff_ptr2, nbytes);
-  cudaMalloc(compressedbuff_ptr1, nbytes);
-  cudaMalloc(compressedbuff_ptr2, nbytes);
-  cudaMemset((void*)compressedbuff1, 1, nbytes);
-  cudaMemset(compressedbuff2, 1, nbytes);
+  //cudaMalloc(compressedbuff_ptr1, nbytes);
+  //cudaMalloc(compressedbuff_ptr2, nbytes);
+  //cudaMemset((void*)compressedbuff1, 1, nbytes);
+  //cudaMemset(compressedbuff2, 1, nbytes);
 
 
   //args->sendBytes = sendCount * wordSize(type);
