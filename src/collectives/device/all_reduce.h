@@ -11,6 +11,10 @@
 #include "cuda.h"
 #include <stdio.h>
 #include <compress.h>
+#include <type_traits>
+
+
+using namespace std;
 
 
 template<int UNROLL, class FUNC, typename T>
@@ -33,12 +37,12 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   T * __restrict__ thisOutput = (T*)args->recvbuff;
 
 
-//*******************************
+//*******************************************************************************************************
   ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>                                 
     prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
   //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>
   //  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
-//*******************************
+//*******************************************************************************************************
 
 
 
@@ -69,10 +73,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     //}
 
 
-//*******************************
+//*******************************************************************************************************
     const T* __restrict__ temp2 = (T*)args->tempbuff2;               //when T != float
     //const int* __restrict__ temp2 = (int*)args->tempbuff2;         //when T == float
-//*******************************
+//*******************************************************************************************************
 
 
     temp2 = compress<T>(thisInput, temp2, nelem);
@@ -86,10 +90,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       nelem = min(realChunkSize, size-offset);
 
 
-//*******************************
+//*******************************************************************************************************
       T* __restrict__ temp = (T*)args->tempbuff1;			//when T != float
       //int* __restrict__ temp = (int*)args->tempbuff1;			//when T == float
-//*******************************
+//*******************************************************************************************************
 
       prims.recv(temp + offset , nelem);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
@@ -112,10 +116,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     nelem = min(realChunkSize, size-offset);
 
 
-//*******************************
+//*******************************************************************************************************
       T* __restrict__ temp = (T*)args->tempbuff1;                  //when T != float
       //int* __restrict__ temp = (int*)args->tempbuff1;            //when T == float
-//*******************************
+//*******************************************************************************************************
 
     prims.directRecv(temp + offset , offset, nelem);
     for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
