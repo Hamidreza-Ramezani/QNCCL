@@ -38,10 +38,12 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 
 
 //*******************************************************************************************************
-  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>                                 
-    prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
-  //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>
+
+  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>          //when T != float                                 
+    prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);                             
+//ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>//when T==float
   //  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+
 //*******************************************************************************************************
 
 
