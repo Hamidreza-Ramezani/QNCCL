@@ -14,7 +14,7 @@
 #include <type_traits>
 
 
-using namespace std;
+//using namespace std;
 
 
 template<int UNROLL, class FUNC, typename T>
@@ -33,18 +33,192 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   const ssize_t size = args->coll.count;
 
   // Compute pointers
-  const T * __restrict__ thisInput = (const T*)args->sendbuff;
-  T * __restrict__ thisOutput = (T*)args->recvbuff;
+  //const T * __restrict__ thisInput = (const T*)args->sendbuff;
+  //T * __restrict__ thisOutput = (T*)args->recvbuff;
 
 
-//*******************************************************************************************************
 
-  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>          //when T != float                                 
+  if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
+    const float * __restrict__ thisInput = (const float*)args->sendbuff;
+    int32_t * __restrict__ thisOutput = (int32_t*)args->recvbuff;
+    ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>
+      prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+
+    for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
+      ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
+      ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
+      ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
+      
+
+      /////////////// begin AllReduce steps ///////////////
+      ssize_t offset;
+      int nelem;
+      int chunk;
+
+      // step 0: push data to next GPU
+      chunk = ring->devUserRanks[nranks-1];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+
+      const int* __restrict__ temp2 = (int*)args->tempbuff2;
+      temp2 = compress(thisInput, temp2, nelem);
+      prims.send(temp2+offset, nelem);
+      //prims.send(thisInput+offset, nelem);
+
+      // k-2 steps: reduce and copy to next GPU
+      for (int j=2; j<nranks; ++j) {
+        chunk = ring->devUserRanks[nranks-j];
+        offset = chunkOffset + chunk * realChunkSize;
+        nelem = min(realChunkSize, size-offset);
+
+        int* __restrict__ temp = (int*)args->tempbuff1;
+
+        prims.recv(temp + offset , nelem);
+        for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+          //temp[idx] = FUNC()(temp[idx], thisInput[idx]);
+          //temp[idx] = FUNC()((T)temp[idx], thisInput[idx]);
+          float var = FuncSum<float>()((float)temp[idx], thisInput[idx]);
+          temp[idx] = compress(var);
+        }
+        prims.send(temp + offset, nelem);
+        //prims.recvReduceSend(thisInput+offset, nelem);
+      }
+
+      chunk = ring->devUserRanks[0];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+
+
+      int* __restrict__ temp = (int*)args->tempbuff1;
+
+      prims.directRecv(temp + offset , offset, nelem);
+      for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+        //temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
+        //temp[idx] = FUNC()(thisInput[idx], (T)temp[idx]);
+        float var = FuncSum<float>()((float)temp[idx], thisInput[idx]);
+        temp[idx] = compress(var);
+      }
+
+      prims.copySend(temp + offset, thisOutput+offset, nelem);
+
+      //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
+
+      // k-2 steps: copy to next GPU
+      for (int j=1; j<nranks-1; ++j) {
+        chunk = ring->devUserRanks[nranks-j];
+        offset = chunkOffset + chunk * realChunkSize;
+        nelem = min(realChunkSize, size-offset);
+
+        prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+      }
+
+      // Make final copy from buffer to dest.
+      chunk = ring->devUserRanks[1];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+
+      // Final wait/copy.
+      prims.directRecv(thisOutput+offset, offset, nelem);
+    }
+  }
+
+  else {
+    const T * __restrict__ thisInput = (const T*)args->sendbuff;
+    T * __restrict__ thisOutput = (T*)args->recvbuff;
+    ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>                               
+      prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);                             
+
+    for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
+      ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
+      ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
+      ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
+      
+
+      /////////////// begin AllReduce steps ///////////////
+      ssize_t offset;
+      int nelem;
+      int chunk;
+
+      // step 0: push data to next GPU
+      chunk = ring->devUserRanks[nranks-1];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+
+
+
+      const T* __restrict__ temp2 = (T*)args->tempbuff2;               //when T != float
+      temp2 = compress<T>(thisInput, temp2, nelem);
+      prims.send(temp2+offset, nelem);
+      //prims.send(thisInput+offset, nelem);
+
+      // k-2 steps: reduce and copy to next GPU
+      for (int j=2; j<nranks; ++j) {
+        chunk = ring->devUserRanks[nranks-j];
+        offset = chunkOffset + chunk * realChunkSize;
+        nelem = min(realChunkSize, size-offset);
+
+        T* __restrict__ temp = (T*)args->tempbuff1;			//when T != float
+
+        prims.recv(temp + offset , nelem);
+        for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+          //temp[idx] = FUNC()(temp[idx], thisInput[idx]);
+          //temp[idx] = FUNC()((T)temp[idx], thisInput[idx]);
+          T var = FUNC()((T)temp[idx], thisInput[idx]);
+          temp[idx] = compress<T>(var);
+        }
+        prims.send(temp + offset, nelem);
+        //prims.recvReduceSend(thisInput+offset, nelem);
+      }
+
+      chunk = ring->devUserRanks[0];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+
+
+      T* __restrict__ temp = (T*)args->tempbuff1;                  //when T != float
+
+      prims.directRecv(temp + offset , offset, nelem);
+      for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+        //temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
+        //temp[idx] = FUNC()(thisInput[idx], (T)temp[idx]);
+        T var = FUNC()((T)temp[idx], thisInput[idx]);
+        temp[idx] = compress<T>(var);
+      }
+
+      prims.copySend(temp + offset, thisOutput+offset, nelem);
+
+      //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
+
+      // k-2 steps: copy to next GPU
+      for (int j=1; j<nranks-1; ++j) {
+        chunk = ring->devUserRanks[nranks-j];
+        offset = chunkOffset + chunk * realChunkSize;
+        nelem = min(realChunkSize, size-offset);
+
+        prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+      }
+
+      // Make final copy from buffer to dest.
+      chunk = ring->devUserRanks[1];
+      offset = chunkOffset + chunk * realChunkSize;
+      nelem = min(realChunkSize, size-offset);
+
+      // Final wait/copy.
+      prims.directRecv(thisOutput+offset, offset, nelem);
+    }
+  }
+
+}
+
+
+/*
+
+//----------------------------------------------------------------------------------------------------------
+  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>                               
     prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);                             
-//ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>//when T==float
-  //  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
-
-//*******************************************************************************************************
+//ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>
+//  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+//----------------------------------------------------------------------------------------------------------
 
 
 
@@ -75,10 +249,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     //}
 
 
-//*******************************************************************************************************
+//----------------------------------------------------------------------------------------------------------
     const T* __restrict__ temp2 = (T*)args->tempbuff2;               //when T != float
     //const int* __restrict__ temp2 = (int*)args->tempbuff2;         //when T == float
-//*******************************************************************************************************
+//----------------------------------------------------------------------------------------------------------
 
 
     temp2 = compress<T>(thisInput, temp2, nelem);
@@ -92,10 +266,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       nelem = min(realChunkSize, size-offset);
 
 
-//*******************************************************************************************************
+//----------------------------------------------------------------------------------------------------------
       T* __restrict__ temp = (T*)args->tempbuff1;			//when T != float
       //int* __restrict__ temp = (int*)args->tempbuff1;			//when T == float
-//*******************************************************************************************************
+//----------------------------------------------------------------------------------------------------------
 
       prims.recv(temp + offset , nelem);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
@@ -118,10 +292,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     nelem = min(realChunkSize, size-offset);
 
 
-//*******************************************************************************************************
+//----------------------------------------------------------------------------------------------------------
       T* __restrict__ temp = (T*)args->tempbuff1;                  //when T != float
       //int* __restrict__ temp = (int*)args->tempbuff1;            //when T == float
-//*******************************************************************************************************
+//----------------------------------------------------------------------------------------------------------
 
     prims.directRecv(temp + offset , offset, nelem);
     for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
@@ -163,6 +337,9 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     prims.directRecv(thisOutput+offset, offset, nelem);
   }
 }
+
+
+*/
 
 
 template<int UNROLL, class FUNC, typename T>

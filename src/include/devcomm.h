@@ -144,7 +144,7 @@ struct CollectiveArgs {
   const void * compressedbuff1;
   void * compressedbuff2;
   //int dummy[10];
-
+  //do_compression:boolean
 
   // Op-specific fields. Make sure the common part stays the
   // same on all structs of the union

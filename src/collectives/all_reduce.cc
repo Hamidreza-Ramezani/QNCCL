@@ -27,7 +27,9 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   //cudaMalloc(compressedbuff_ptr2, nbytes);
   //cudaMemset((void*)compressedbuff1, 1, nbytes);
   //cudaMemset(compressedbuff2, 1, nbytes);
-
+ 
+  //if ncclDataType == float
+  //do_compress == true; 
 
   //args->sendBytes = sendCount * wordSize(type);
   //args->expectedBytes = recvCount * wordSize(type);

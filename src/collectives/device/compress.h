@@ -41,7 +41,6 @@ inline __device__ const int* compress(const float* src, const int* compressedSrc
   return compressedSrc;
 }
 
-
 //template<>
 inline __device__ int compress(float src) {
 
