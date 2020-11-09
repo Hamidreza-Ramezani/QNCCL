@@ -60,8 +60,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
-      const int* __restrict__ temp2 = (int*)args->tempbuff2;
-      temp2 = compress(thisInput, temp2, nelem);
+      int* __restrict__ temp2 = (int*)args->tempbuff2;
+      temp2 = compress(thisInput, temp2, nelem, args->coll.nThreads);
       prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
 
@@ -78,7 +78,7 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
           //temp[idx] = FUNC()(temp[idx], thisInput[idx]);
           //temp[idx] = FUNC()((T)temp[idx], thisInput[idx]);
           float var = FuncSum<float>()((float)temp[idx], thisInput[idx]);
-          temp[idx] = compress(var);
+          temp[idx] = compress(var, args->coll.nThreads);
         }
         prims.send(temp + offset, nelem);
         //prims.recvReduceSend(thisInput+offset, nelem);
@@ -96,7 +96,7 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
         //temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
         //temp[idx] = FUNC()(thisInput[idx], (T)temp[idx]);
         float var = FuncSum<float>()((float)temp[idx], thisInput[idx]);
-        temp[idx] = compress(var);
+        temp[idx] = compress(var, args->coll.nThreads);
       }
 
       prims.copySend(temp + offset, thisOutput+offset, nelem);
