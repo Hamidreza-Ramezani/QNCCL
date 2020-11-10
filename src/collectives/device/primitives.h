@@ -304,21 +304,7 @@ class ncclPrimitives {
 
   __device__ __forceinline__ void
   recv(T* dst, int nelem) {
-//    if(threadIdx.x == 0 && blockIdx.x == 0){
-//	printf("I am in thread 0 \n");
-//	for (int i = 0; i < nelem; ++i){
-//		printf("the entry: %d \n is: %d", i, dst[i]);
-//	}
-//    }
-
     GenericOp<0, 0, 1, 0, 0, 1>(NULL, dst, nelem, 0);
-
-//    if(threadIdx.x == 0 && blockIdx.x == 0){
-//	printf("I am in thread 0 \n");
-//	for (int i = 0; i < nelem; ++i){
-//		printf("the entry: %d \n is: %d", i, dst[i]);
-//	}
-//    }
   }
   __device__ __forceinline__ void
   directRecv(T* dst, ssize_t directOffset, int nelem) {
