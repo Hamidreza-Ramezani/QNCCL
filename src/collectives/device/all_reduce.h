@@ -35,6 +35,7 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
+    //float * __restrict__ thisOutput = (float*)args->recvbuff;
     int32_t * __restrict__ thisOutput = (int32_t*)args->recvbuff;
     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>
       prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
@@ -58,7 +59,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       compress(thisInput, temp2, offset, nelem, args->coll.nThreads);
       //temp2+offset = compress(thisInput+offset, temp2+offset, nelem, args->coll.nThreads);
 
-
       prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
 
@@ -79,7 +79,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
         prims.send(temp + offset, nelem);
         //prims.recvReduceSend(thisInput+offset, nelem);
       }
-
       chunk = ring->devUserRanks[0];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
@@ -93,7 +92,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
         float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
         compress(var, temp+idx, args->coll.nThreads);
       }
-
       prims.copySend(temp + offset, thisOutput+offset, nelem);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
