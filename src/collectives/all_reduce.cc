@@ -30,7 +30,6 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
  
   //if ncclDataType == float
   //do_compress == true; 
-
   //args->sendBytes = sendCount * wordSize(type);
   //args->expectedBytes = recvCount * wordSize(type);
   //size_t totalnbytes = max(args->sendBytes, args->expectedBytes);

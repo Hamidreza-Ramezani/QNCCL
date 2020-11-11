@@ -14,8 +14,22 @@
 #include <type_traits>
 
 
+
+template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
+template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
+
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
+  if (args->with_compression) {
+    ncclAllReduceRingKernel_new<UNROLL,FUNC,T>(args);
+  } else {
+    ncclAllReduceRingKernel_old<UNROLL,FUNC,T>(args);
+  }
+}
+
+
+template<int UNROLL, class FUNC, typename T>
+__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int tid = threadIdx.x;
   const int nthreads = args->coll.nThreads-WARP_SIZE;
   const int bid = args->coll.bid;
@@ -28,6 +42,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
+
+  //if (threadIdx.x == 0 && blockIdx.x == 0) {
+  //  printf("I am in the new kernel\n");
+  //}
 
   // Compute pointers
   //const T * __restrict__ thisInput = (const T*)args->sendbuff;
@@ -348,6 +366,12 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
+
+
+  //if (threadIdx.x == 0 && blockIdx.x == 0) {
+  //  printf("I am in the old kernel\n");
+  //}
+
 
   // Compute pointers
   const T * __restrict__ thisInput = (const T*)args->sendbuff;

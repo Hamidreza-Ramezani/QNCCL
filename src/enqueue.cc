@@ -366,6 +366,16 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.compressedbuff1 = info->compressedbuff1;
   coll->args.compressedbuff2 = info->compressedbuff2;
 
+  char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
+  coll->args.with_compression = false;
+
+  if (ring_allReduce_version == NULL) {
+    coll->args.with_compression = false;
+  } else if (strcasecmp(ring_allReduce_version, "new") == 0) {
+    coll->args.with_compression = true;
+  } else if (strcasecmp(ring_allReduce_version, "old") == 0) {
+    coll->args.with_compression = false;
+  }
 
 
   //cudaSetDevice(info->comm->cudaDev);
