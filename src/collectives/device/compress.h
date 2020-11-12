@@ -1,5 +1,8 @@
 #include "cuda_runtime.h"
 #include "cuda.h"
+#include <stdint.h>
+
+
 
 template<typename T>
 __device__ T* compress(T* dst, T* compressedDst, int nelem) {
@@ -24,33 +27,30 @@ __device__ T compress(T src) {
 
 //template<>
 //inline __device__ int* compress<float>(float* dst, int* compressedDst, int nelem) {
-__device__ __forceinline__ int* compress(float* dst, int* compressedDst, int nelem, int nthreads) {
-  for (int idx = 0; idx < nelem; idx += 1) {
+__device__ __forceinline__ void compress(float* dst, int* compressedDst, int offset, int nelem, int nthreads) {
+  const int tid = threadIdx.x;
+  for (int idx = offset+tid; idx < offset+nelem; idx += nthreads) {
     int var;
     if (dst[idx] < 0) {
-       var = static_cast<int> (dst[idx] - 0.5);
-    }
-    else {
-       var = static_cast<int> (dst[idx] + 0.5); 
+      var = static_cast<int> (dst[idx] - 0.5);
+    } else {
+      var = static_cast<int> (dst[idx] + 0.5); 
     }
     compressedDst[idx] = var;
   }
-
-  return compressedDst;
 }
 
 
 //template<>
 //inline __device__ const int* compress<float>(const float* src, const int* compressedSrc, int nelem) {
-inline __device__ void compress(const float* src, int* compressedSrc, int offset, int nelem, int nthreads) {
+__device__ __forceinline__ void compress(const float* src, int8_t* compressedSrc, int offset, int nelem, int nthreads) {
   const int tid = threadIdx.x;
   for (int idx = offset+tid; idx < offset+nelem; idx += nthreads) {
     int var;
     if (src[idx] < 0) {
-       var = static_cast<int> (src[idx] - 0.5);
-    }
-    else {
-       var = static_cast<int> (src[idx] + 0.5); 
+      var = static_cast<int8_t> (src[idx] - 0.5);
+    } else {
+      var = static_cast<int8_t> (src[idx] + 0.5); 
     }
     compressedSrc[idx] = var;
   }
@@ -58,14 +58,42 @@ inline __device__ void compress(const float* src, int* compressedSrc, int offset
 
 
 //template<>
-__device__  __forceinline__ void compress(float src, int* compressedSrc, int nthreads) {
+__device__  __forceinline__ void compress(float src, int8_t* compressedSrc, int nthreads) {
   if (src < 0) {
-     *compressedSrc = static_cast<int> (src - 0.5);
-  }
-  else { 
-  *compressedSrc = static_cast<int> (src + 0.5);
+    *compressedSrc = static_cast<int8_t> (src - 0.5);
+  } else { 
+    *compressedSrc = static_cast<int8_t> (src + 0.5);
   }
 }
+
+
+
+
+
+////template<>
+////inline __device__ const int* compress<float>(const float* src, const int* compressedSrc, int nelem) {
+//__device__ __forceinline__ void compress(const float* src, int* compressedSrc, int offset, int nelem, int nthreads) {
+//  const int tid = threadIdx.x;
+//  for (int idx = offset+tid; idx < offset+nelem; idx += nthreads) {
+//    int var;
+//    if (src[idx] < 0) {
+//      var = static_cast<int> (src[idx] - 0.5);
+//    } else {
+//      var = static_cast<int> (src[idx] + 0.5); 
+//    }
+//    compressedSrc[idx] = var;
+//  }
+//}
+//
+//
+////template<>
+//__device__  __forceinline__ void compress(float src, int* compressedSrc, int nthreads) {
+//  if (src < 0) {
+//    *compressedSrc = static_cast<int> (src - 0.5);
+//  } else { 
+//    *compressedSrc = static_cast<int> (src + 0.5);
+//  }
+//}
 
 
 //__device__ __forceinline__ void compress(const float* src, int* compressedSrc, int offset, int nelem, int nthreads) {

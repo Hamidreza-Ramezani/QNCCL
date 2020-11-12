@@ -54,8 +54,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
     //float * __restrict__ thisOutput = (float*)args->recvbuff;
-    int32_t * __restrict__ thisOutput = (int32_t*)args->recvbuff;
-    ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int32_t, 1, 1, 1, FuncSum<int32_t>>
+    int8_t * __restrict__ thisOutput = (int8_t*)args->recvbuff;
+    ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int8_t, 1, 1, 1, FuncSum<int8_t>>
       prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
@@ -73,7 +73,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
-      int* __restrict__ temp2 = (int*)args->tempbuff2;
+      int8_t* __restrict__ temp2 = (int8_t*)args->tempbuff2;
       compress(thisInput, temp2, offset, nelem, args->coll.nThreads);
       //temp2+offset = compress(thisInput+offset, temp2+offset, nelem, args->coll.nThreads);
 
@@ -86,7 +86,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
 
-        int* __restrict__ temp = (int*)args->tempbuff1;
+        int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
         prims.recv(temp + offset , nelem);
         for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
@@ -101,7 +101,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
-      int* __restrict__ temp = (int*)args->tempbuff1;
+      int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
       prims.directRecv(temp + offset , offset, nelem);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
