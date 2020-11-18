@@ -141,8 +141,8 @@ struct CollectiveArgs {
   void * recvbuff;
   void * tempbuff1;
   void * tempbuff2;
-  const void * compressedbuff1;
-  void * compressedbuff2;
+  //const void * compressedbuff1;
+  //void * compressedbuff2;
   bool with_compression;
   
   //int dummy[10];

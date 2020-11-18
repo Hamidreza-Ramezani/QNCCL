@@ -14,7 +14,6 @@
 #include <type_traits>
 
 
-
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
 
@@ -43,10 +42,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
 
-  //if (threadIdx.x == 0 && blockIdx.x == 0) {
-  //  printf("I am in the new kernel\n");
-  //}
-
   // Compute pointers
   //const T * __restrict__ thisInput = (const T*)args->sendbuff;
   //T * __restrict__ thisOutput = (T*)args->recvbuff;
@@ -61,6 +56,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
       ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
       ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
+      //ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(int8_t));
       ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
 
       /////////////// begin AllReduce steps ///////////////
@@ -76,6 +72,14 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       int8_t* __restrict__ temp2 = (int8_t*)args->tempbuff2;
       compress(thisInput, temp2, offset, nelem, args->coll.nThreads);
       //temp2+offset = compress(thisInput+offset, temp2+offset, nelem, args->coll.nThreads);
+      
+      //if(threadIdx.x == 0 && blockIdx.x == 0) {
+      //  int sliceSize = stepSize*ALLREDUCE_SLICESTEPS;
+      //  int dataSize = max(DIVUP(nelem, 16*ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS)*16, sliceSize/32);
+      //  int realSize = max(0, min(dataSize, nelem-offset));
+      //  int a = realSize * sizeof(temp2[0]);
+      //  printf("%d number of bytes is communicated in QNCCL\n", a);
+      //}
 
       prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
@@ -89,8 +93,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
         prims.recv(temp + offset , nelem);
+        #pragma unroll
         for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
           //temp[idx] = FUNC()(temp[idx], thisInput[idx]);
+          //temp[idx] = FuncSum<int8_t>()(static_cast<int8_t>(thisInput[idx]), temp[idx]);
           float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
           compress(var, temp+idx, args->coll.nThreads);
         }
@@ -104,9 +110,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
       prims.directRecv(temp + offset , offset, nelem);
+      #pragma unroll
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
         //temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
-        //temp[idx] = FUNC()(thisInput[idx], (T)temp[idx]);
+        //temp[idx] = FUNC()(thisInput[idx], temp[idx]);
+        //temp[idx] = FuncSum<int8_t>()(static_cast<int8_t>(thisInput[idx]), temp[idx]);
         float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
         compress(var, temp+idx, args->coll.nThreads);
       }
@@ -132,6 +140,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
     }
   }
 
+
+
   else {
     const T * __restrict__ thisInput = (const T*)args->sendbuff;
     T * __restrict__ thisOutput = (T*)args->recvbuff;
@@ -153,7 +163,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       chunk = ring->devUserRanks[nranks-1];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
-
 
 
       const T* __restrict__ temp2 = (T*)args->tempbuff2;               //when T != float
@@ -217,9 +226,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       prims.directRecv(thisOutput+offset, offset, nelem);
     }
   }
-
 }
-
 
 /*
 
@@ -368,11 +375,6 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
   const ssize_t size = args->coll.count;
 
 
-  //if (threadIdx.x == 0 && blockIdx.x == 0) {
-  //  printf("I am in the old kernel\n");
-  //}
-
-
   // Compute pointers
   const T * __restrict__ thisInput = (const T*)args->sendbuff;
   T * __restrict__ thisOutput = (T*)args->recvbuff;
@@ -395,12 +397,22 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
 
+    //if(threadIdx.x == 0 && blockIdx.x == 0) {
+    //  int sliceSize = stepSize*ALLREDUCE_SLICESTEPS;
+    //  int dataSize = max(DIVUP(nelem, 16*ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS)*16, sliceSize/32);
+    //  int realSize = max(0, min(dataSize, nelem-offset));
+    //  int a = realSize * sizeof(thisInput[0]);
+    //  printf("%d number of bytes is communicated in original NCCL\n", a);
+    //}
+
     prims.send(thisInput+offset, nelem);
     for (int j=2; j<nranks; ++j) {
       chunk = ring->devUserRanks[nranks-j];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
       
+      //prims.recv(thisOutput+offset, nelem);
+      //prims.send(thisInput+offset, nelem);
       prims.recvReduceSend(thisInput+offset, nelem);
     }
 
@@ -409,6 +421,9 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
     chunk = ring->devUserRanks[0];
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
+
+    //prims.directRecv(thisOutput+offset, offset, nelem);
+    //prims.copySend(thisInput+offset, thisOutput+offset, nelem);
 
     prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 

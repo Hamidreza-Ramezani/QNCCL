@@ -7,6 +7,7 @@
 #include "enqueue.h"
 #include "argcheck.h"
 #include "coll_net.h"
+#include <cuda_profiler_api.h>
 
 // Only generate inline kernels for LL
 #define NCCL_FUNC5(coll, op, dtype) \
@@ -77,11 +78,13 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
   //printf("count1: %d \n", count1);
   //count1 ++;    
   if (cgMode & 0x01) {
+    cudaProfilerStart();
     //size_t heapSize = 128 * 1024 * 1024;
     //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
     CUDACHECK(cudaLaunchCooperativeKernelMultiDevice(paramsList, numDevices,
             // These flags are to reduce the latency of using this API
             cudaCooperativeLaunchMultiDeviceNoPreSync|cudaCooperativeLaunchMultiDeviceNoPostSync));
+    cudaProfilerStop();
     return ncclSuccess;
   }
 #endif
@@ -363,8 +366,8 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.recvbuff = info->recvbuff;
   coll->args.tempbuff1 = info->tempbuff1;
   coll->args.tempbuff2 = info->tempbuff2;
-  coll->args.compressedbuff1 = info->compressedbuff1;
-  coll->args.compressedbuff2 = info->compressedbuff2;
+  //coll->args.compressedbuff1 = info->compressedbuff1;
+  //coll->args.compressedbuff2 = info->compressedbuff2;
 
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
   coll->args.with_compression = false;
@@ -624,8 +627,8 @@ end:
     NCCLCHECK(ncclEnqueueEvents(info->comm));
     CUDACHECK(cudaFree(info->tempbuff1));
     CUDACHECK(cudaFree(info->tempbuff2));
-    CUDACHECK(cudaFree((void*)info->compressedbuff1));
-    CUDACHECK(cudaFree(info->compressedbuff2));
+    //CUDACHECK(cudaFree((void*)info->compressedbuff1));
+    //CUDACHECK(cudaFree(info->compressedbuff2));
     return ncclSuccess;
   }
 }
