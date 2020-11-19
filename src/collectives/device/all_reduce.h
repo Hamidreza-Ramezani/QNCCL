@@ -114,6 +114,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
         float var = static_cast<float>(temp[idx]) + thisInput[idx];
         temp[idx] = static_cast<int8_t>(var);
+        thisOutput[idx] = static_cast<float>(temp[idx]);
         //compress(var, temp+idx);
       }
       prims.copySend(temp + offset, thisOutput1+offset, nelem);
@@ -135,9 +136,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       // Final wait/copy.
       prims.directRecv(thisOutput1+offset, offset, nelem);
     }
-    for (int idx=tid; idx<size; idx+=nthreads) {
-      thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-    }
+    //for (int idx=tid; idx<size; idx+=nthreads) {
+    //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
+    //}
   }
 
   else {
