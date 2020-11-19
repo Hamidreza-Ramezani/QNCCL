@@ -135,7 +135,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       // Final wait/copy.
       prims.directRecv(thisOutput1+offset, offset, nelem);
     }
-    for (int idx = tid; idx < size; idx += args->coll.nThreads) {
+    for (int idx=tid; idx<size; idx+=nthreads) {
       thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
     }
   }
