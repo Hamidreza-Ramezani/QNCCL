@@ -46,19 +46,20 @@ __device__ __forceinline__ void compress(float* dst, int* compressedDst, int off
 __device__ __forceinline__ void compress(const float* src, int8_t* compressedSrc, int offset, int nelem, int nthreads) {
   const int tid = threadIdx.x;
   for (int idx = offset+tid; idx < offset+nelem; idx += nthreads) {
-    int var;
-    if (src[idx] < 0) {
-      var = static_cast<int8_t> (src[idx] - 0.5);
-    } else {
-      var = static_cast<int8_t> (src[idx] + 0.5); 
-    }
-    compressedSrc[idx] = var;
+    //int var;
+    //if (src[idx] < 0) {
+    //  var = static_cast<int8_t> (src[idx] - 0.5);
+    //} else {
+    //  var = static_cast<int8_t> (src[idx] + 0.5); 
+    //}
+    //compressedSrc[idx] = var;
+    compressedSrc[idx] = static_cast<int8_t>(src[idx]);
   }
 }
 
 
 //template<>
-__device__  __forceinline__ void compress(float src, int8_t* compressedSrc, int nthreads) {
+__device__  __forceinline__ void compress(float src, int8_t* compressedSrc) {
   if (src < 0) {
     *compressedSrc = static_cast<int8_t> (src - 0.5);
   } else { 

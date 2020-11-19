@@ -93,12 +93,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
         prims.recv(temp + offset , nelem);
-        #pragma unroll
-        for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
-          //temp[idx] = FUNC()(temp[idx], thisInput[idx]);
-          //temp[idx] = FuncSum<int8_t>()(static_cast<int8_t>(thisInput[idx]), temp[idx]);
-          float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
-          compress(var, temp+idx, args->coll.nThreads);
+        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+          //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
+          float var = static_cast<float>(temp[idx]) + thisInput[idx];
+          temp[idx] = static_cast<int8_t>(var);
+          //compress(var, temp+idx);
         }
         prims.send(temp + offset, nelem);
         //prims.recvReduceSend(thisInput+offset, nelem);
@@ -110,13 +109,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
       prims.directRecv(temp + offset , offset, nelem);
-      #pragma unroll
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
-        //temp2[idx] = FUNC()(thisInput[idx], temp2[idx]);
-        //temp[idx] = FUNC()(thisInput[idx], temp[idx]);
-        //temp[idx] = FuncSum<int8_t>()(static_cast<int8_t>(thisInput[idx]), temp[idx]);
-        float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
-        compress(var, temp+idx, args->coll.nThreads);
+        //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
+        float var = static_cast<float>(temp[idx]) + thisInput[idx];
+        temp[idx] = static_cast<int8_t>(var);
+        //compress(var, temp+idx);
       }
       prims.copySend(temp + offset, thisOutput+offset, nelem);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
@@ -129,7 +126,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
         prims.directRecvCopySend(thisOutput+offset, offset, nelem);
       }
-
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
       offset = chunkOffset + chunk * realChunkSize;
@@ -137,10 +133,13 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       prims.directRecv(thisOutput+offset, offset, nelem);
+
+      //for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+      //  thisOutput[idx] = static_cast<float>(thisOutput[idx]) + thisInput[idx];
+      //}
+
     }
   }
-
-
 
   else {
     const T * __restrict__ thisInput = (const T*)args->sendbuff;
