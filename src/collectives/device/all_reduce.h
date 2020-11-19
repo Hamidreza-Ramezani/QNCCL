@@ -127,6 +127,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         nelem = min(realChunkSize, size-offset);
 
         prims.directRecvCopySend(thisOutput1+offset, offset, nelem);
+        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+          thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
+        }
       }
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
@@ -135,10 +138,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       prims.directRecv(thisOutput1+offset, offset, nelem);
+      for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+        thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
+      }
     }
-    //for (int idx=tid; idx<size; idx+=nthreads) {
-    //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-    //}
   }
 
   else {
