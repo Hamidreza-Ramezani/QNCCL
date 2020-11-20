@@ -13,7 +13,6 @@
 #include <compress.h>
 #include <type_traits>
 
-
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
 
@@ -41,6 +40,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
+  int index = threadIdx.x + blockIdx.x * blockDim.x;
+
 
   // Compute pointers
   //const T * __restrict__ thisInput = (const T*)args->sendbuff;
@@ -50,6 +51,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
     float * __restrict__ thisOutput = (float*)args->recvbuff;
     int8_t * __restrict__ thisOutput1 = (int8_t*)args->tempbuff2;
+    //int8_t * __restrict__ thisOutput1 = (int8_t*)args->recvbuff;
 
     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, int8_t, 1, 1, 1, FuncSum<int8_t>>
       prims(tid, nthreads, &ring->prev, &ring->next, thisOutput1, stepSize, channel, comm);
@@ -94,6 +96,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
         prims.recv(temp + offset , nelem);
+
+        //for (int idx=offset+index; idx<offset+nelem; idx += gridDim.x*blockDim.x) {
+        //  float var = static_cast<float>(temp[idx]) + thisInput[idx];
+        //  temp[idx] = static_cast<int8_t>(var);
+        //}
+
         for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
           //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
           float var = static_cast<float>(temp[idx]) + thisInput[idx];
@@ -110,11 +118,20 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
       prims.directRecv(temp + offset , offset, nelem);
+
+
+      //for (int idx=offset+index; idx<offset+nelem; idx += gridDim.x*blockDim.x) {
+      //  float var = static_cast<float>(temp[idx]) + thisInput[idx];
+      //  temp[idx] = static_cast<int8_t>(var);
+      //}
+
+
+
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
         //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
         float var = static_cast<float>(temp[idx]) + thisInput[idx];
         temp[idx] = static_cast<int8_t>(var);
-        thisOutput[idx] = static_cast<float>(temp[idx]);
+        //thisOutput[idx] = static_cast<float>(temp[idx]);
         //compress(var, temp+idx);
       }
       prims.copySend(temp + offset, thisOutput1+offset, nelem);
@@ -127,9 +144,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         nelem = min(realChunkSize, size-offset);
 
         prims.directRecvCopySend(thisOutput1+offset, offset, nelem);
-        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-          thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-        }
+        //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+        //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
+        //}
       }
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
@@ -138,10 +155,18 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       prims.directRecv(thisOutput1+offset, offset, nelem);
-      for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-        thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-      }
+      //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+      //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
+      //}
     }
+    //int i = threadIdx.x + blockIdx.x * blockDim.x;
+    //for (; i<size; i += gridDim.x * blockDim.x)
+    //    thisOutput[i] = static_cast<float>(thisOutput1[i]);
+
+
+    //memcpy(thisOutput, thisOutput1, size * sizeof(float));
+    //memcpy((void*)thisOutput, (void*)thisOutput1, size);
+    //cudaMemcpyAsync((void*)thisOutput, (void*)thisOutput1, size, cudaMemcpyDeviceToDevice);
   }
 
   else {
