@@ -8,8 +8,8 @@
 #include "argcheck.h"
 #include "coll_net.h"
 #include <cuda_profiler_api.h>
-#include <algorithm>
-#include <iostream>
+
+
 
 // Only generate inline kernels for LL
 #define NCCL_FUNC5(coll, op, dtype) \
@@ -623,7 +623,6 @@ end:
     if (savedDev != -1) CUDACHECK(cudaSetDevice(savedDev));
     ncclAsyncErrCheck(ret);
 
-
     //int8_t* h_recvbuff = (int8_t*)malloc(info->count);
     //printf("h_recvbuff is as follows: \n");
     //cudaMemcpy(h_recvbuff, info->tempbuff2, info->count, cudaMemcpyDeviceToHost);
@@ -631,7 +630,6 @@ end:
     //  printf("h_recvbuff[%d] = %d\n", i, h_recvbuff[i]);
     //}
     //cudaMemcpy((void*)(info->recvbuff), (void*)(info->tempbuff2), info->count, cudaMemcpyHostToHost); 
-
 
     return ret;
   } else {
@@ -652,10 +650,9 @@ end:
     //float a[8] = {1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0};
     //cudaMemcpy(info->recvbuff, a, 8, cudaMemcpyDefault);
     
-   
     //printf("tempbuff2 is as follows: \n");
     //for (int i=0; i<info->count; ++i) {
-    //  printf("tempbuff2[%d] = %d\n", i, ((int8_t*)(info->tempbuff2))[i]);
+    //  printf("tempbuff2 [%d] = %d\n", i, *(((int8_t*)(info->tempbuff2))+i));
     //}
 
     //cudaMemcpy((void*)(info->recvbuff), (void*)(info->tempbuff2), info->count, cudaMemcpyHostToHost); 
@@ -665,7 +662,6 @@ end:
     //cudaMemcpy(info->recvbuff, info->tempbuff2, info->count, cudaMemcpyDeviceToDevice);
     //CUDACHECK(cudaFree(info->tempbuff1));
     //CUDACHECK(cudaFree(info->tempbuff2));
-
 
     //CUDACHECK(cudaFree((void*)info->compressedbuff1));
     //CUDACHECK(cudaFree(info->compressedbuff2));

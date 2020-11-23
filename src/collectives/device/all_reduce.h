@@ -13,8 +13,10 @@
 #include <compress.h>
 #include <type_traits>
 
+
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
+
 
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
@@ -40,7 +42,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
-  int index = threadIdx.x + blockIdx.x * blockDim.x;
+  //int index = threadIdx.x + blockIdx.x * blockDim.x;
 
 
   // Compute pointers
@@ -91,6 +93,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         chunk = ring->devUserRanks[nranks-j];
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
+        int nelem2 = nelem/4;
 
         int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
@@ -101,7 +104,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //  temp[idx] = static_cast<int8_t>(var);
         //}
 
-        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+        //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+        for (int idx=offset+tid; idx<offset+nelem2; idx += args->coll.nThreads) {
           //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
           float var = static_cast<float>(temp[idx]) + thisInput[idx];
           temp[idx] = static_cast<int8_t>(var);
@@ -113,6 +117,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       chunk = ring->devUserRanks[0];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
+      int nelem2 = nelem/4;
 
       int8_t* __restrict__ temp = (int8_t*)args->tempbuff1;
 
@@ -126,7 +131,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
 
 
-      for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+      //for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+      for (int idx = offset+tid; idx < offset+nelem2; idx += args->coll.nThreads) {
         //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
         float var = static_cast<float>(temp[idx]) + thisInput[idx];
         temp[idx] = static_cast<int8_t>(var);
@@ -141,9 +147,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         chunk = ring->devUserRanks[nranks-j];
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
+        int nelem2 = nelem/4;
 
         prims.directRecvCopySend(thisOutput1+offset, offset, nelem);
-        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+        for (int idx=offset+tid; idx<offset+nelem2; idx += args->coll.nThreads) {
           thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
         }
       }
@@ -151,17 +158,19 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       chunk = ring->devUserRanks[1];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
+      nelem2 = nelem/4;
 
       // Final wait/copy.
       prims.directRecv(thisOutput1+offset, offset, nelem);
-      for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+      //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+      for (int idx=offset+tid; idx<offset+nelem2; idx += args->coll.nThreads) {
         thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
       }
     }
     //int i = threadIdx.x + blockIdx.x * blockDim.x;
-    //for (; i<size; i += gridDim.x * blockDim.x)
+    //for (; i<size; i += gridDim.x * blockDim.x) {
     //    thisOutput[i] = static_cast<float>(thisOutput1[i]);
-
+    //}
 
     //memcpy(thisOutput, thisOutput1, size * sizeof(float));
     //memcpy((void*)thisOutput, (void*)thisOutput1, size);
