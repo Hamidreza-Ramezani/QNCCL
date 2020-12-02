@@ -377,6 +377,7 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.recvbuff = info->recvbuff;
   coll->args.tempbuff1 = info->tempbuff1;
   coll->args.tempbuff2 = info->tempbuff2;
+  coll->args.tempbuff3 = info->tempbuff3;
   //coll->args.compressedbuff1 = info->compressedbuff1;
   //coll->args.compressedbuff2 = info->compressedbuff2;
 

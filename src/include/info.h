@@ -31,6 +31,7 @@ struct ncclInfo {
   void* recvbuff;
   void* tempbuff1;
   void* tempbuff2;
+  void* tempbuff3;
   //const void* compressedbuff1;
   //void* compressedbuff2;
   size_t count;

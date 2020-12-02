@@ -78,7 +78,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       compress(thisInput+offset, temp2+offset, nelem, args->coll.nThreads);
       //quantize<8>(thisInput+offset, temp2+offset, nelem, 512);      
 
-
       //if(threadIdx.x == 0 && blockIdx.x == 0) {
       //  int sliceSize = stepSize*ALLREDUCE_SLICESTEPS;
       //  int dataSize = max(DIVUP(nelem, 16*ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS)*16, sliceSize/32);
@@ -97,16 +96,20 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         nelem = min(realChunkSize, size-offset);
 
         unsigned char* __restrict__ temp = (unsigned char*)args->tempbuff1;
+        float * __restrict__ temp3 = (float*)args->tempbuff3;
 
         prims.recv(temp + offset , nelem);
 
+        decompress(temp+offset, temp3+offset, nelem, args->coll.nThreads);
         for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
           //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
-          float var = static_cast<float>(temp[idx]) + thisInput[idx];
-          //temp[idx] = static_cast<int8_t>(var);
-          compress(var, (unsigned char*)(temp+idx));
-          //quantize<8>(&var, (unsigned char*)(temp+idx), 1, 1);
+          //float var = static_cast<float>(temp[idx]) + thisInput[idx];
+          //compress(var, (unsigned char*)(temp+idx));
+          //temp3[idx] = static_cast<float>(temp[idx]) + thisInput[idx];
+          temp3[idx] = temp3[idx] + thisInput[idx];
         }
+        compress(temp3+offset, temp+offset, nelem, args->coll.nThreads);
+
         prims.send(temp + offset, nelem);
         //prims.recvReduceSend(thisInput+offset, nelem);
       }
@@ -115,17 +118,21 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       nelem = min(realChunkSize, size-offset);
 
       unsigned char* __restrict__ temp = (unsigned char*)args->tempbuff1;
+      float * __restrict__ temp3 = (float*)args->tempbuff3;
 
       prims.directRecv(temp + offset , offset, nelem);
 
+
+      decompress(temp+offset, temp3+offset, nelem, args->coll.nThreads);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
         //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
-        float var = static_cast<float>(temp[idx]) + thisInput[idx];
-        //temp[idx] = static_cast<int8_t>(var);
-        compress(var, (unsigned char*)(temp+idx));
-        //quantize<8>(&var, (unsigned char*)(temp+idx), 1, 1);
-        thisOutput[idx] = static_cast<float>(temp[idx]);
+        //float var = static_cast<float>(temp[idx]) + thisInput[idx];
+        //compress(var, (unsigned char*)(temp+idx));
+        //thisOutput[idx] = static_cast<float>(temp[idx]);
+        temp3[idx] = temp3[idx] + thisInput[idx];
       }
+      compress(temp3+offset, temp+offset, nelem, args->coll.nThreads);
+
       prims.copySend(temp + offset, thisOutput1+offset, nelem);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
@@ -136,9 +143,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         nelem = min(realChunkSize, size-offset);
 
         prims.directRecvCopySend(thisOutput1+offset, offset, nelem);
-        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-          thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-        }
+        //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+        //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
+        //}
       }
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
@@ -147,9 +154,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       prims.directRecv(thisOutput1+offset, offset, nelem);
-      for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-        thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-      }
+      //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+      //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
+      //}
+      decompress(thisOutput1, thisOutput, size, args->coll.nThreads);
     }
     //int i = threadIdx.x + blockIdx.x * blockDim.x;
     //for (; i<size; i += gridDim.x * blockDim.x) {

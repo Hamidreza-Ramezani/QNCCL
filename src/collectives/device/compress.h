@@ -17,9 +17,9 @@
 
 
 template<typename T>
-__device__ T* compress(T* dst, T* compressedDst, int nelem) {
+__device__ T* compress(T* src, T* compressedSrc, int nelem) {
    
-  return dst;
+  return src;
 }
 
 
@@ -37,35 +37,19 @@ __device__ T compress(T src) {
 }
 
 
-__device__ __forceinline__ void compress(float* dst, int8_t* compressedDst, int offset, int nelem, int nthreads) {
-  const int tid = threadIdx.x;
-  for (int idx = offset+tid; idx < offset+nelem; idx += nthreads) {
-    int8_t var;
-    if (dst[idx] < 0) {
-      var = static_cast<int8_t> (dst[idx] - 0.5);
-    } else {
-      var = static_cast<int8_t> (dst[idx] + 0.5);
-    }
-    compressedDst[idx] = var;
-  }
-}
-
-
-
-__device__ __forceinline__ void compress(const float* src, int8_t* compressedSrc, int nelem, int nthreads) {
+__device__ __forceinline__ void compress(float* src, unsigned char* compressedSrc, int nelem, int nthreads) {
   const int tid = threadIdx.x;
   for (int idx = tid; idx < nelem; idx += nthreads) {
     //int8_t var;
     //if (src[idx] < 0) {
     //  var = static_cast<int8_t> (src[idx] - 0.5);
     //} else {
-    //  var = static_cast<int8_t> (src[idx] + 0.5); 
+    //  var = static_cast<int8_t> (src[idx] + 0.5);
     //}
     //compressedSrc[idx] = var;
-    compressedSrc[idx] = static_cast<int8_t>(src[idx]);
+    compressedSrc[idx] = static_cast<unsigned char>(src[idx]);
   }
 }
-
 
 
 __device__ __forceinline__ void compress(const float* src, unsigned char* compressedSrc, int nelem, int nthreads) {
@@ -83,21 +67,19 @@ __device__ __forceinline__ void compress(const float* src, unsigned char* compre
 }
 
 
-__device__  __forceinline__ void compress(float src, int8_t* compressedSrc) {
-  if (src < 0) {
-    *compressedSrc = static_cast<int8_t> (src - 0.5);
-  } else { 
-    *compressedSrc = static_cast<int8_t> (src + 0.5);
-  }
-}
-
-
-
 __device__  __forceinline__ void compress(float src, unsigned char* compressedSrc) {
   if (src < 0) {
     *compressedSrc = static_cast<unsigned char> (src - 0.5);
   } else { 
     *compressedSrc = static_cast<unsigned char> (src + 0.5);
+  }
+}
+
+
+__device__ __forceinline__ void decompress(unsigned char* src, float* decompressedSrc, int nelem, int nthreads) {
+  const int tid = threadIdx.x;
+  for (int idx = tid; idx < nelem; idx += nthreads) {
+    decompressedSrc[idx] = static_cast<float>(src[idx]);
   }
 }
 
