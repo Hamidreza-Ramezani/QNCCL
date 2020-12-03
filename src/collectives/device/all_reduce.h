@@ -105,7 +105,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
           //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
           //float var = static_cast<float>(temp[idx]) + thisInput[idx];
           //compress(var, (unsigned char*)(temp+idx));
-          //temp3[idx] = static_cast<float>(temp[idx]) + thisInput[idx];
           temp3[idx] = temp3[idx] + thisInput[idx];
         }
         compress(temp3+offset, temp+offset, nelem, args->coll.nThreads);
@@ -122,16 +121,15 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       prims.directRecv(temp + offset , offset, nelem);
 
-
       decompress(temp+offset, temp3+offset, nelem, args->coll.nThreads);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
         //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
         //float var = static_cast<float>(temp[idx]) + thisInput[idx];
         //compress(var, (unsigned char*)(temp+idx));
-        //thisOutput[idx] = static_cast<float>(temp[idx]);
         temp3[idx] = temp3[idx] + thisInput[idx];
       }
       compress(temp3+offset, temp+offset, nelem, args->coll.nThreads);
+      decompress(temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
 
       prims.copySend(temp + offset, thisOutput1+offset, nelem);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
@@ -143,9 +141,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         nelem = min(realChunkSize, size-offset);
 
         prims.directRecvCopySend(thisOutput1+offset, offset, nelem);
-        //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-        //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-        //}
+        decompress(thisOutput1+offset, thisOutput+offset, nelem, args->coll.nThreads);
       }
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
@@ -154,19 +150,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       prims.directRecv(thisOutput1+offset, offset, nelem);
-      //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-      //  thisOutput[idx] = static_cast<float>(thisOutput1[idx]);
-      //}
-      decompress(thisOutput1, thisOutput, size, args->coll.nThreads);
+      decompress(thisOutput1+offset, thisOutput+offset, nelem, args->coll.nThreads);
     }
     //int i = threadIdx.x + blockIdx.x * blockDim.x;
     //for (; i<size; i += gridDim.x * blockDim.x) {
     //    thisOutput[i] = static_cast<float>(thisOutput1[i]);
     //}
-
-    //memcpy(thisOutput, thisOutput1, size * sizeof(float));
-    //memcpy((void*)thisOutput, (void*)thisOutput1, size);
-    //cudaMemcpyAsync((void*)thisOutput, (void*)thisOutput1, size, cudaMemcpyDeviceToDevice);
   }
 
   else {
