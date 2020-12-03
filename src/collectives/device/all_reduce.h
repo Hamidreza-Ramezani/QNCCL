@@ -42,7 +42,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
-  //int index = threadIdx.x + blockIdx.x * blockDim.x;
 
 
   // Compute pointers
@@ -52,10 +51,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
     float * __restrict__ thisOutput = (float*)args->recvbuff;
-    unsigned char * __restrict__ thisOutput1 = (unsigned char*)args->tempbuff2;
+    unsigned char * __restrict__ compressedOutput = (unsigned char*)args->tempbuff2;
 
     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, unsigned char, 1, 1, 1, FuncSum<unsigned char>>
-      prims(tid, nthreads, &ring->prev, &ring->next, thisOutput1, stepSize, channel, comm);
+      prims(tid, nthreads, &ring->prev, &ring->next, compressedOutput, stepSize, channel, comm);
 
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
       ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
@@ -73,9 +72,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
-      unsigned char* __restrict__ temp2 = (unsigned char*)args->tempbuff1;
-      //compress(thisInput, temp2, offset, nelem, args->coll.nThreads);
-      compress(thisInput+offset, temp2+offset, nelem, args->coll.nThreads);
+      unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
+      compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
       //quantize<8>(thisInput+offset, temp2+offset, nelem, 512);      
 
       //if(threadIdx.x == 0 && blockIdx.x == 0) {
@@ -86,7 +84,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //  printf("%d number of bytes is communicated in QNCCL\n", a);
       //}
 
-      prims.send(temp2+offset, nelem);
+      prims.send(compressed_temp+offset, nelem);
+      //prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
 
       // k-2 steps: reduce and copy to next GPU
@@ -95,43 +94,43 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
 
-        unsigned char* __restrict__ temp = (unsigned char*)args->tempbuff1;
-        float * __restrict__ temp3 = (float*)args->tempbuff3;
+        unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
+        float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-        prims.recv(temp + offset , nelem);
+        prims.recv(compressed_temp + offset, nelem);
 
-        decompress(temp+offset, temp3+offset, nelem, args->coll.nThreads);
+        decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
         for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-          //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
-          //float var = static_cast<float>(temp[idx]) + thisInput[idx];
-          //compress(var, (unsigned char*)(temp+idx));
-          temp3[idx] = temp3[idx] + thisInput[idx];
+          //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
+          //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
+          //compress(var, (unsigned char*)(compressed_temp+idx));
+          decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
         }
-        compress(temp3+offset, temp+offset, nelem, args->coll.nThreads);
+        compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
 
-        prims.send(temp + offset, nelem);
+        prims.send(compressed_temp + offset, nelem);
         //prims.recvReduceSend(thisInput+offset, nelem);
       }
       chunk = ring->devUserRanks[0];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
-      unsigned char* __restrict__ temp = (unsigned char*)args->tempbuff1;
-      float * __restrict__ temp3 = (float*)args->tempbuff3;
+      //unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
+      float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-      prims.directRecv(temp + offset , offset, nelem);
+      prims.directRecv(compressed_temp + offset , offset, nelem);
 
-      decompress(temp+offset, temp3+offset, nelem, args->coll.nThreads);
+      decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
-        //float var = FuncSum<float>()(static_cast<float>(temp[idx]), thisInput[idx]);
-        //float var = static_cast<float>(temp[idx]) + thisInput[idx];
-        //compress(var, (unsigned char*)(temp+idx));
-        temp3[idx] = temp3[idx] + thisInput[idx];
+        //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
+        //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
+        //compress(var, (unsigned char*)(compressed_temp+idx));
+        decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
       }
-      compress(temp3+offset, temp+offset, nelem, args->coll.nThreads);
-      decompress(temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
+      compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+      decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
 
-      prims.copySend(temp + offset, thisOutput1+offset, nelem);
+      prims.copySend(compressed_temp + offset, compressedOutput+offset, nelem);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
       // k-2 steps: copy to next GPU
@@ -140,8 +139,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
 
-        prims.directRecvCopySend(thisOutput1+offset, offset, nelem);
-        decompress(thisOutput1+offset, thisOutput+offset, nelem, args->coll.nThreads);
+        prims.directRecvCopySend(compressedOutput+offset, offset, nelem);
+        decompress(compressedOutput+offset, thisOutput+offset, nelem, args->coll.nThreads);
       }
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
@@ -149,12 +148,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       nelem = min(realChunkSize, size-offset);
 
       // Final wait/copy.
-      prims.directRecv(thisOutput1+offset, offset, nelem);
-      decompress(thisOutput1+offset, thisOutput+offset, nelem, args->coll.nThreads);
+      prims.directRecv(compressedOutput+offset, offset, nelem);
+      decompress(compressedOutput+offset, thisOutput+offset, nelem, args->coll.nThreads);
     }
     //int i = threadIdx.x + blockIdx.x * blockDim.x;
     //for (; i<size; i += gridDim.x * blockDim.x) {
-    //    thisOutput[i] = static_cast<float>(thisOutput1[i]);
+    //    thisOutput[i] = static_cast<float>(compressedOutput[i]);
     //}
   }
 
