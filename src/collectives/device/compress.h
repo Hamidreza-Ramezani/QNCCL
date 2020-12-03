@@ -259,7 +259,6 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
 template <int BITS>
 inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size) {
   unsigned int num_blocks = gridDim.x;
-  //unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
   unsigned int bid = blockIdx.x;
   unsigned int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
   unsigned int cur_bucket_size;
