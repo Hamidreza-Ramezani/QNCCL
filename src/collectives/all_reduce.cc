@@ -23,7 +23,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   void** tempbuff_ptr3 = &tempbuff3;
   //const void** compressedbuff_ptr1 = &compressedbuff1;
   //void** compressedbuff_ptr2 = &compressedbuff2;
-  cudaMalloc(tempbuff_ptr1, nbytes/4);
+  cudaMalloc(tempbuff_ptr1, nbytes);
   //cudaMalloc(tempbuff_ptr2, nbytes/4);
   cudaMalloc(tempbuff_ptr3, nbytes);
   //cudaMalloc(compressedbuff_ptr1, nbytes);
