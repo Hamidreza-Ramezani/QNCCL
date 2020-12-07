@@ -42,8 +42,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
-
-
+  
   // Compute pointers
   //const T * __restrict__ thisInput = (const T*)args->sendbuff;
   //T * __restrict__ thisOutput = (T*)args->recvbuff;
@@ -59,7 +58,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
       ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
       ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
-      //ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(int8_t));
+      //ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(unsigned char));
       ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
 
       /////////////// begin AllReduce steps ///////////////
@@ -73,9 +72,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       nelem = min(realChunkSize, size-offset);
 
       unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
-      compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      //quantize<8>(thisInput+offset, compressed_temp+offset, nelem, 512);      
+      //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
 
+      //quantize<8>(thisInput+offset, compressed_temp+offset, nelem, 512);      
+      quantize<8>(thisInput+offset, compressed_temp+offset, offset +nelem, 512);      
       //if(threadIdx.x == 0 && blockIdx.x == 0) {
       //  int sliceSize = stepSize*ALLREDUCE_SLICESTEPS;
       //  int dataSize = max(DIVUP(nelem, 16*ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS)*16, sliceSize/32);
@@ -99,16 +99,17 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
         prims.recv(compressed_temp + offset, nelem);
 
-        decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
-        //dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, 512);      
+        //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
+        dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, offset+nelem, 512);      
         for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
           //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
           //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
           //compress(var, (unsigned char*)(compressed_temp+idx));
           decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
         }
-        compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+        //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
         //quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, 512);      
+        quantize<8>(decompressed_temp+offset, compressed_temp+offset, offset+nelem, 512);      
 
         prims.send(compressed_temp + offset, nelem);
         //prims.recvReduceSend(thisInput+offset, nelem);
@@ -122,18 +123,19 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       prims.directRecv(compressed_temp + offset , offset, nelem);
 
-      decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
-      //dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, 512);      
+      //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
+      dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, offset+nelem, 512);      
       for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
         //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
         //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
         //compress(var, (unsigned char*)(compressed_temp+idx));
         decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
       }
-      compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+      //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
       //quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, 512);      
-      decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, 512);      
+      quantize<8>(decompressed_temp+offset, compressed_temp+offset, offset+nelem, 512);      
+      //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
+      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, offset+nelem, 512);      
 
       prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
@@ -145,8 +147,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         nelem = min(realChunkSize, size-offset);
 
         prims.directRecvCopySend(compressed_temp+offset, offset, nelem);
-        decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-        //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, 512);      
+        //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
+        dequantize<true,8>(compressed_temp+offset, thisOutput+offset, offset+nelem, 512);      
       }
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
@@ -155,8 +157,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       prims.directRecv(compressed_temp+offset, offset, nelem);
-      decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, 512);      
+      //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
+      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, offset+nelem, 512);      
     }
     //int i = threadIdx.x + blockIdx.x * blockDim.x;
     //for (; i<size; i += gridDim.x * blockDim.x) {
@@ -484,7 +486,7 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
   const ssize_t size = args->coll.count;
 
 
-  //printf("hello World2 \n");
+  //printf("2\n");
 
   if (loopSize > size) {
     chunkSize = DIVUP(size, nChannels*minChunkSize)*minChunkSize;
@@ -545,7 +547,7 @@ __device__ void ncclAllReduceCollNetKernel(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*chunkSize;
   const ssize_t size = args->coll.count;
 
- //printf("hello World3 \n");
+  //printf("3\n");
   
   if (loopSize > size) {
     chunkSize = DIVUP(size, nChannels*minChunkSize)*minChunkSize;
@@ -608,7 +610,7 @@ __device__ void ncclAllReduceRingLLKernel(struct CollectiveArgs* args) {
 
   ncclLLPrimitives<T, FUNC, 1, 1> LLprims(tid, nthreads, &ring->prev, &ring->next, stepLines, channel, comm);
 
-  //printf("hello World4 \n");
+  //printf("4\n");
 
   // Compute pointers
   const T * __restrict__ thisInput = (const T*)args->sendbuff;
@@ -679,7 +681,7 @@ __device__ void ncclAllReduceTreeLLKernel(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*chunkSize;
   const ssize_t size = args->coll.count;
 
- //printf("hello World5 \n");
+  //printf("5\n");
 
 
   if (loopSize > size) {
@@ -741,7 +743,7 @@ __device__ void ncclAllReduceCollNetLLKernel(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*chunkSize;
   const ssize_t size = args->coll.count;
 
-  //printf("hello World6 \n"); 
+  //printf("6\n");
 
   if (loopSize > size) {
     chunkSize = DIVUP(size, nChannels*minChunkSize)*minChunkSize;
@@ -806,6 +808,7 @@ __device__ void ncclAllReduceRingLL128Kernel(struct CollectiveArgs* args) {
 
   ncclLL128Primitives<T, FUNC, 1, 1> LLprims(tid, nthreads, &ring->prev, &ring->next, stepSize, channel, comm);
 
+  //printf("7\n");
 
 
   // Compute pointers
@@ -879,6 +882,9 @@ __device__ void ncclAllReduceTreeLL128Kernel(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*chunkSize;
   int nthreadsSplit = NCCL_LL128_SPLIT(nthreads);
   const ssize_t size = args->coll.count;
+
+
+  //printf("8\n");
 
   if (loopSize > size) {
     chunkSize = DIVUP(size, nChannels*minChunkSize)*minChunkSize;

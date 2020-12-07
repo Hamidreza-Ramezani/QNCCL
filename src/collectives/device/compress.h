@@ -321,10 +321,6 @@ inline __device__ void quantize(const float* input_data, unsigned char* output_d
         //(unsigned char*)(meta + meta_multiplier * bucket_id),
         cur_bucket_size);
   }
-  //printf("The output of quantization is as follows: \n");
-  //for (int i=0; i<num_elems; ++i) {
-  //  printf("quantized array[%d] = %u \n", i, output_data[i]);
-  //}
 }
 
 
@@ -364,9 +360,37 @@ inline __device__ void dequantize(unsigned char* input_data, float* output, int 
       }
     }
   }
-
-  //printf("The output of dequantization is as follows: \n");
-  //for (int i=0; i<num_elems; ++i) {
-  //  printf("dequantized array[%d] = %f\n", i, output[i]);
-  //}
 }
+
+
+
+
+//template <bool ADD, int BITS>
+//inline __device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int nthreads) {
+//  unsigned int tid = threadIdx.x;
+//  unsigned int stride = nthreads;
+//
+//  unsigned int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
+//  float* meta_info = (float*)input_data;
+//  unsigned char* input; 
+//  const int meta_multiplier = 2;
+//  input = input_data + meta_multiplier * sizeof(float) * num_buckets;
+//  
+//  int num_char = (BITS * num_elems + PACK_SIZE - 1) / PACK_SIZE;
+//  unsigned int divisor = 1 << BITS;
+//  for (unsigned int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += stride) {
+//    uint64_t value = 0;
+//    for (int j = 0; j < BITS && i * BITS + j < num_char; j++) {
+//      value |= ((uint64_t)input[i * BITS + j]) << (j * PACK_SIZE);
+//    }
+//    for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
+//      unsigned char encoded_value = (value >> (j * BITS)) & (divisor - 1);
+//      float d = MaxMinDecodeValue(encoded_value, meta_info, i * PACK_SIZE + j, bucket_size);
+//      if (ADD) {
+//        output[i * PACK_SIZE + j] = output[i * PACK_SIZE + j] + d;
+//      } else {
+//        output[i * PACK_SIZE + j] = d;
+//      }
+//    }
+//  }
+//}
