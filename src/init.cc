@@ -27,6 +27,9 @@
 #define STR2(v) #v
 #define STR(v) STR2(v)
 
+#define MAX_NTHREADS 256
+
+
 #ifdef ENABLE_TRACE
 std::chrono::high_resolution_clock::time_point ncclEpoch;
 #endif
@@ -329,8 +332,8 @@ ncclResult_t initParams(struct ncclComm* comm) {
   struct cudaLaunchParams* params = comm->myParams = comm->intraParams+comm->intraRank;
   params->args = &comm->argsptr;
   params->stream = NULL;
-  params->sharedMem = 0;
-  //params->sharedMem = 1024 * 1024;
+  //params->sharedMem = 0;
+  params->sharedMem = MAX_NTHREADS * 2 * sizeof(float);
   params->blockDim.x = 0; params->blockDim.y = params->blockDim.z = 1;
   params->gridDim.x = 0; params->gridDim.y = params->gridDim.z = 1;
   return ncclSuccess;
