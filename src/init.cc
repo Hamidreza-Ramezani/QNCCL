@@ -27,7 +27,7 @@
 #define STR2(v) #v
 #define STR(v) STR2(v)
 
-#define MAX_NTHREADS 256
+#define MAX_NTHREADS 288
 
 
 #ifdef ENABLE_TRACE
