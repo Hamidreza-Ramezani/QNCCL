@@ -43,6 +43,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
 
+
   // Compute pointers
   //const T * __restrict__ thisInput = (const T*)args->sendbuff;
   //T * __restrict__ thisOutput = (T*)args->recvbuff;
@@ -73,7 +74,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
       //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize<8>(thisInput+offset, compressed_temp+offset, nelem, 512, args->coll.nThreads);      
+      quantize<8>(thisInput+offset, compressed_temp+offset, nelem, 512, args->coll.nThreads);
 
       //if(threadIdx.x == 0 && blockIdx.x == 0) {
       //  int sliceSize = stepSize*ALLREDUCE_SLICESTEPS;
@@ -101,12 +102,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
         dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, 512, args->coll.nThreads);      
 
-        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-          //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
-          //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
-          //compress(var, (unsigned char*)(compressed_temp+idx));
-          decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
-        }
+        //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+        //  //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
+        //  //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
+        //  //compress(var, (unsigned char*)(compressed_temp+idx));
+        //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
+        //}
         //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
         quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, 512, args->coll.nThreads);      
         
@@ -125,12 +126,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
       dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, 512, args->coll.nThreads);      
 
-      for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
-        //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
-        //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
-        //compress(var, (unsigned char*)(compressed_temp+idx));
-        decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
-      }
+      //for (int idx = offset+tid; idx < offset+nelem; idx += args->coll.nThreads) {
+      //  //float var = FuncSum<float>()(static_cast<float>(compressed_temp[idx]), thisInput[idx]);
+      //  //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
+      //  //compress(var, (unsigned char*)(compressed_temp+idx));
+      //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
+      //}
       //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
       quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, 512, args->coll.nThreads);      
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
@@ -144,7 +145,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         chunk = ring->devUserRanks[nranks-j];
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
-       
+
         prims.directRecvCopySend(compressed_temp+offset, offset, nelem);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
         dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, 512, args->coll.nThreads);      
@@ -159,9 +160,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
       dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, 512, args->coll.nThreads);
     }
+    //for (int i=tid; i<size; i+=args->coll.nThreads) {
+    //    thisOutput[i] = decompressed_temp[i];
+    //}
     //int i = threadIdx.x + blockIdx.x * blockDim.x;
     //for (; i<size; i += gridDim.x * blockDim.x) {
-    //    thisOutput[i] = static_cast<float>(compressedOutput[i]);
+    //    thisOutput[i] = static_cast<float>((args->tempbuff3)[i]);
     //}
   }
 

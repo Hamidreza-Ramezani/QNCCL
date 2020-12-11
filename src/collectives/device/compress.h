@@ -165,19 +165,48 @@ __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int
   //int stride = nthreads;
   //int index = 1;
   //int stride = blockDim.x;
+  //if(index == 0){
+  //   for (int i=0; i<num_elem; i++) { 
+  //      printf("input is %f ",input[i]);
+  //   }
+  //   printf("\n");
+  //}
 
+  if (threadIdx.x == 0) {
+  printf("block size: %d\n", blockDim.x);
+  printf("grid size: %d\n", gridDim.x);
   const int divisor = (1 << BITS) - 1;
   float* meta_buf = (float*)meta;
-  for (int i = index; i < (num_elem + bucket_size - 1) / bucket_size; i += stride) {
-    float mmin = input[i * bucket_size];
-    float mmax = input[i * bucket_size];
-    for (int j = i * bucket_size + 1; j < fminf((i + 1) * bucket_size, num_elem); j++) {
+  for (int i = index; i < (num_elem); i += gridDim.x * bucket_size) {
+  //for (int i = index; i < (num_elem + bucket_size - 1) / bucket_size; i += gridDim.x) {
+  //for (int i = index; i < (num_elem + bucket_size - 1) / bucket_size; i += stride) {
+    float mmin = input[i];
+    //float mmin = input[i * bucket_size];
+    float mmax = input[i];
+    //float mmax = input[i * bucket_size];
+    for (int j = i + 1; j < fminf(bucket_size, num_elem-i); j++) {
+    //for (int j = i * bucket_size + 1; j < fminf((i + 1) * bucket_size, num_elem); j++) {
       mmin = fminf(mmin, input[j]);
       mmax = fmaxf(mmax, input[j]);
     }
-    meta_buf[2 * i] = static_cast<float>((mmax - mmin) / divisor);
-    meta_buf[2 * i + 1] = mmin;
+    if(mmin==0 ){
+     printf("input is ");
+     for (int i=0; i<num_elem; i++) { 
+        printf("%f ",input[i]);
+     }
+     printf("\n");
+    //printf("mmin is %f\n",mmin);
+    //printf("mmax is %f\n",mmax);
+    }
+    meta_buf[i/bucket_size] = static_cast<float>((mmax - mmin) / divisor);
+    //meta_buf[2 * i] = static_cast<float>((mmax - mmin) / divisor);
+    meta_buf[i/bucket_size + 1] = mmin;
+    //meta_buf[2 * i + 1] = mmin;
   }
+   
+  }
+  __syncthreads();
+  
 }
 
 template <int BITS>
@@ -258,19 +287,18 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
       for (int j = 0; j < BITS && i * BITS + j < num_char; j++) {
         output[i * BITS + j] = value >> (PACK_SIZE * j) & 0xFF;
       }
-    }
+  }
 }
 
 
 template <int BITS>
 inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int nthreads) {
-  //if (num_elems < 0) {
-  //  num_elems = 0;
-  //}
+  if (num_elems < 0) { 
+   num_elems = 0; 
+  }  
+
   int num_blocks = gridDim.x;
   int bid = blockIdx.x;
-  //int num_blocks = 1;
-  //int bid = 0;
 
   int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
   int cur_bucket_size;
@@ -293,7 +321,6 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
     CompressBucket<BITS>(
         input + bucket_size * bucket_id, output + compressed_size * bucket_id,
         (meta + meta_multiplier * bucket_id),
-        //(unsigned char*)(meta + meta_multiplier * bucket_id),
         cur_bucket_size, nthreads);
   }
 }
@@ -301,13 +328,12 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
 
 template <int BITS>
 inline __device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int nthreads) {
-  //if (num_elems < 0) {
-  //  num_elems = 0;
-  //}
+
+  if (num_elems < 0) { 
+   num_elems = 0; 
+  }  
   int num_blocks = gridDim.x;
   int bid = blockIdx.x;
-  //int num_blocks = 1;
-  //int bid = 0;
 
   int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
   int cur_bucket_size;
@@ -330,7 +356,6 @@ inline __device__ void quantize(const float* input_data, unsigned char* output_d
     CompressBucket<BITS>(
         input + bucket_size * bucket_id, output + compressed_size * bucket_id,
         (meta + meta_multiplier * bucket_id),
-        //(unsigned char*)(meta + meta_multiplier * bucket_id),
         cur_bucket_size, nthreads);
   }
 }
@@ -346,18 +371,18 @@ inline __device__ float MaxMinDecodeValue(unsigned char input, float* meta_info,
 
 template <bool ADD, int BITS>
 inline __device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int nthreads) {
-  //if (num_elems < 0) {
-  //  num_elems = 0;
-  //}
+  if (num_elems < 0) { 
+   num_elems = 0; 
+  }  
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   int stride = gridDim.x * blockDim.x;
 
   int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
   float* meta_info = (float*)input_data;
-  unsigned char* input; 
+  unsigned char* input;
   const int meta_multiplier = 2;
   input = input_data + meta_multiplier * sizeof(float) * num_buckets;
-  
+
   int num_char = (BITS * num_elems + PACK_SIZE - 1) / PACK_SIZE;
   int divisor = 1 << BITS;
   for (int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += stride) {

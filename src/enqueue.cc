@@ -268,8 +268,8 @@ ncclResult_t ncclBarrierEnqueueWait(ncclComm_t comm) {
 
 ncclResult_t ncclEnqueueEvents(ncclComm_t comm) {
   struct cudaLaunchParams *params = comm->myParams;
-  size_t heapSize = 128 * 1024 * 1024;
-  cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
+  //size_t heapSize = 128 * 1024 * 1024;
+  //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
   // Enqueue event after NCCL kernel
   CUDACHECK(cudaEventRecord(comm->doneEvent, params->stream));
   // Use internal NCCL stream for CGMD/GROUP launch if required or if the user stream is NULL
