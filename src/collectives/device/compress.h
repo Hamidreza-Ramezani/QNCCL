@@ -173,8 +173,8 @@ __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int
   //}
 
   if (threadIdx.x == 0) {
-  printf("block size: %d\n", blockDim.x);
-  printf("grid size: %d\n", gridDim.x);
+  //printf("block size: %d\n", blockDim.x);
+  //printf("grid size: %d\n", gridDim.x);
   const int divisor = (1 << BITS) - 1;
   float* meta_buf = (float*)meta;
   for (int i = index; i < (num_elem); i += gridDim.x * bucket_size) {
@@ -189,15 +189,16 @@ __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int
       mmin = fminf(mmin, input[j]);
       mmax = fmaxf(mmax, input[j]);
     }
-    if(mmin==0 ){
-     printf("input is ");
-     for (int i=0; i<num_elem; i++) { 
-        printf("%f ",input[i]);
-     }
-     printf("\n");
-    //printf("mmin is %f\n",mmin);
-    //printf("mmax is %f\n",mmax);
-    }
+    //if(mmin == 0){
+    // printf("input is ");
+    // for (int i=0; i<num_elem; i++) { 
+    //    printf("%f ",input[i]);
+    // }
+    // printf("\n");
+    //}
+
+
+
     meta_buf[i/bucket_size] = static_cast<float>((mmax - mmin) / divisor);
     //meta_buf[2 * i] = static_cast<float>((mmax - mmin) / divisor);
     meta_buf[i/bucket_size + 1] = mmin;
@@ -293,9 +294,9 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
 
 template <int BITS>
 inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int nthreads) {
-  if (num_elems < 0) { 
-   num_elems = 0; 
-  }  
+  if (num_elems < 0) {
+   num_elems = 0;
+  }
 
   int num_blocks = gridDim.x;
   int bid = blockIdx.x;

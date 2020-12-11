@@ -74,6 +74,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
       //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+
+      if(tid == 0 && blockIdx.x == 0) {
+         printf("before the first quantization call, the last element of the input buffer is %f\n", thisInput[offset+nelem]); 
+      }
+      __syncthreads();
+
       quantize<8>(thisInput+offset, compressed_temp+offset, nelem, 512, args->coll.nThreads);
 
       //if(threadIdx.x == 0 && blockIdx.x == 0) {
@@ -109,6 +115,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
         //}
         //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+
+      if(tid == 0 && blockIdx.x == 0) {
+         printf("before the second quantization call, the last element of the input buffer is %f\n", decompressed_temp[offset+nelem]); 
+      }
+      __syncthreads();
+
         quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, 512, args->coll.nThreads);      
         
         prims.send(compressed_temp + offset, nelem);
@@ -133,6 +145,13 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
       //}
       //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+
+
+      if(tid == 0 && blockIdx.x == 0) {
+         printf("before the third quantization call, the last element of the input buffer is %f\n", decompressed_temp[offset+nelem]); 
+      }
+      __syncthreads();
+
       quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, 512, args->coll.nThreads);      
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
       dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, 512, args->coll.nThreads);      
