@@ -146,7 +146,7 @@ struct CollectiveArgs {
   //void * compressedbuff2;
   bool with_compression;
   
-  //int dummy[10];
+  int dummy[10];
   //do_compression:boolean
 
   // Op-specific fields. Make sure the common part stays the
@@ -183,7 +183,7 @@ struct ncclColl {
     int data[0x10];
   };
 };
-//static_assert(sizeof(struct ncclColl) == (0x20*sizeof(int)), "ncclColl must have a pow2 size");
+static_assert(sizeof(struct ncclColl) == (0x20*sizeof(int)), "ncclColl must have a pow2 size");
 
 struct ncclChannel {
   union {
