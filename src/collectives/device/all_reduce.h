@@ -112,8 +112,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
 
-        int num_buckets = DIVUP(nelem, bucket_size);
-        int meta_size = 2 * sizeof(float) * num_buckets;   
+        num_buckets = DIVUP(nelem, bucket_size);
+        meta_size = 2 * sizeof(float) * num_buckets;   
 
         unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
         float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
@@ -235,8 +235,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
 
-        int num_buckets = DIVUP(nelem, bucket_size);
-        int meta_size = 2 * sizeof(float) * num_buckets;   
+        num_buckets = DIVUP(nelem, bucket_size);
+        meta_size = 2 * sizeof(float) * num_buckets;   
 
         prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
