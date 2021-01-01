@@ -44,15 +44,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t size = args->coll.count;
   int bucket_size = nthreads;
 
-  //if(tid == 0) {
-  //   printf("the gridDim is %d\n", gridDim.x);
-  //   printf("the nChannels is %d\n", nChannels);
-  //   printf("the blockIdx.x is %d\n", blockIdx.x);
-  //   printf("the bid is %d\n", bid);
-  //}
-  // Compute pointers
-  //const T * __restrict__ thisInput = (const T*)args->sendbuff;
-  //T * __restrict__ thisOutput = (T*)args->recvbuff;
+  //int num_buckets = DIVUP(size, bucket_size);
+  //int meta_size = 2 * sizeof(float) * num_buckets;
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
@@ -60,7 +53,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
     unsigned char * __restrict__ compressedOutput = (unsigned char*)args->tempbuff2;
 
     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, unsigned char, 1, 1, 1, FuncSum<unsigned char>>
-      prims(tid, nthreads, &ring->prev, &ring->next, (unsigned char*)thisOutput, stepSize, channel, comm);
+      prims(tid, nthreads, &ring->prev, &ring->next, compressedOutput, stepSize, channel, comm);
 
 
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
@@ -108,16 +101,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //}
       //__syncthreads();
 
-
-      //if(threadIdx.x == 0 && blockIdx.x == 0) {
-      //  int sliceSize = stepSize*ALLREDUCE_SLICESTEPS;
-      //  int dataSize = max(DIVUP(nelem, 16*ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS)*16, sliceSize/32);
-      //  int realSize = max(0, min(dataSize, nelem-offset));
-      //  int a = realSize * sizeof(temp2[0]);
-      //  printf("%d number of bytes is communicated in QNCCL\n", a);
-      //}
-
       prims.send(compressed_temp+offset, nelem+meta_size);
+
       //prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
 
@@ -126,6 +111,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         chunk = ring->devUserRanks[nranks-j];
         offset = chunkOffset + chunk * realChunkSize;
         nelem = min(realChunkSize, size-offset);
+
         int num_buckets = DIVUP(nelem, bucket_size);
         int meta_size = 2 * sizeof(float) * num_buckets;   
 
