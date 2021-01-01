@@ -218,15 +218,16 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
         //compress(var, (unsigned char*)(compressed_temp+idx));
         decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
-        thisOutput[idx] = decompressed_temp[idx];
+        //thisOutput[idx] = decompressed_temp[idx];
       }
       //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
       quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
-      //__syncthreads();
+      __syncthreads();
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 5);
+      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 5);
 
-      prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
+      prims.copySend(compressed_temp + offset, compressedOutput + offset, nelem+meta_size);
+      //prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
       // k-2 steps: copy to next GPU
@@ -238,9 +239,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         num_buckets = DIVUP(nelem, bucket_size);
         meta_size = 2 * sizeof(float) * num_buckets;   
 
-        prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
+        prims.directRecvCopySend(compressedOutput+offset, offset, nelem+meta_size);
+        //prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-        dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
+        dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
+        //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
       }
       // Make final copy from buffer to dest.
       chunk = ring->devUserRanks[1];
@@ -251,9 +254,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       meta_size = 2 * sizeof(float) * num_buckets;   
 
       // Final wait/copy.
-      prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
+      prims.directRecv(compressedOutput+offset, offset, nelem+meta_size);
+      //prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
+      dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
+      //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
 
       //__syncthreads();
       //if(tid == 0 && blockIdx.x == 0) {
