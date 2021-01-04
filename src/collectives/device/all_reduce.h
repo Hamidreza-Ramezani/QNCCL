@@ -54,12 +54,13 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, unsigned char, 1, 1, 1, FuncSum<unsigned char>>
       prims(tid, nthreads, &ring->prev, &ring->next, compressedOutput, stepSize, channel, comm);
+    //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, float, 1, 1, 1, FuncSum<float>>
+    //  prims2(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
 
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
       ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
       ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
-      //ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(unsigned char));
       ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
 
       /////////////// begin AllReduce steps ///////////////
@@ -78,12 +79,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
 
       //if(tid == 0 && blockIdx.x == 0) {
-      //     printf("before the first quantization call, the elements of the input buffer is as follows:\n");
+      //     printf("before the first quantization call in device:%d\n", ring->devUserRanks[0]);
       //     printf("offset is %d\n", offset);
       //     printf("nelem is %d\n", nelem);
-      //     for (int i=0; i<8; i++) {
-      //        printf("%f- ", *(thisInput+offset+i));
-      //     }
+      //     //for (int i=0; i<8; i++) {
+      //     //   printf("%f- ", *(thisInput+offset+i));
+      //     //}
       //     printf("\n\n\n");
       //}
       //__syncthreads();
@@ -188,6 +189,13 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       num_buckets = DIVUP(nelem, bucket_size);
       meta_size = 2 * sizeof(float) * num_buckets;   
+      //if(tid == 0 && blockIdx.x == 0) {
+      //     printf("before the last reduce in device:%d\n", ring->devUserRanks[0]);
+      //     printf("offset is %d\n", offset);
+      //     printf("nelem is %d\n", nelem);
+      //     printf("\n\n\n");
+      //}
+      //__syncthreads();
 
       //unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
       float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
@@ -226,6 +234,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
       dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 5);
 
+      //prims2.copySend(decompressed_temp + offset, thisOutput + offset, nelem);
       prims.copySend(compressed_temp + offset, compressedOutput + offset, nelem+meta_size);
       //prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
@@ -239,6 +248,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         num_buckets = DIVUP(nelem, bucket_size);
         meta_size = 2 * sizeof(float) * num_buckets;   
 
+        //prims2.directRecvCopySend(thisOutput+offset, offset, nelem);
         prims.directRecvCopySend(compressedOutput+offset, offset, nelem+meta_size);
         //prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
@@ -249,11 +259,19 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       chunk = ring->devUserRanks[1];
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
+      //if(tid == 0 && blockIdx.x == 0) {
+      //     printf("before the last copy in device:%d\n", ring->devUserRanks[0]);
+      //     printf("offset is %d\n", offset);
+      //     printf("nelem is %d\n", nelem);
+      //     printf("\n\n\n");
+      //}
+      //__syncthreads();
 
       num_buckets = DIVUP(nelem, bucket_size);
       meta_size = 2 * sizeof(float) * num_buckets;   
 
       // Final wait/copy.
+      //prims2.directRecv(thisOutput+offset, offset, nelem);
       prims.directRecv(compressedOutput+offset, offset, nelem+meta_size);
       //prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
