@@ -113,7 +113,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //__syncthreads();
 
       prims.send(compressed_temp+offset, nelem+meta_size);
-      //prims.send(compressed_temp+offset, nelem);
 
       //prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
