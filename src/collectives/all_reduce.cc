@@ -39,8 +39,9 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   int num_buckets = DIVUP(count, bucket_size);
   int meta_size = 2 * sizeof(float) * num_buckets;
 
-  cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
-  cudaMalloc(tempbuff_ptr2, nbytes/4 + meta_size);
+  cudaMalloc(tempbuff_ptr1, nbytes);
+  //cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
+  //cudaMalloc(tempbuff_ptr2, nbytes/4 + meta_size);
   cudaMalloc(tempbuff_ptr3, nbytes);
  
   //cudaMemcpy(tempbuff1, (void*)a, count*sizeof(float), cudaMemcpyHostToDevice);

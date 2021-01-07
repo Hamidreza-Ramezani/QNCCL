@@ -381,6 +381,8 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   //coll->args.compressedbuff1 = info->compressedbuff1;
   //coll->args.compressedbuff2 = info->compressedbuff2;
 
+
+
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
   coll->args.with_compression = false;
 
@@ -426,6 +428,14 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.coll.count = info->count;
   coll->args.coll.nChannels = info->nChannels;
   coll->args.coll.nThreads = info->nThreads;
+
+  //int bucket_size = info->nThreads - 32;
+  //int num_buckets = DIVUP(info->count, bucket_size);
+  //int meta_size = 2 * sizeof(float) * num_buckets;
+  //cudaSetDevice(info->comm->cudaDev);
+  //void** tempbuff_ptr1 = &(coll->args.tempbuff1);
+  //cudaMalloc(tempbuff_ptr1, (info->nBytes)/4 + meta_size);
+  //cudaDeviceSynchronize();
 
   coll->funcIndex = FUNC_INDEX(info->coll, info->op, info->datatype, info->algorithm, info->protocol);
 
@@ -624,14 +634,6 @@ end:
     if (savedDev != -1) CUDACHECK(cudaSetDevice(savedDev));
     ncclAsyncErrCheck(ret);
 
-    //int8_t* h_recvbuff = (int8_t*)malloc(info->count);
-    //printf("h_recvbuff is as follows: \n");
-    //cudaMemcpy(h_recvbuff, info->tempbuff2, info->count, cudaMemcpyDeviceToHost);
-    //for (int i=0; i<info->count; ++i) {
-    //  printf("h_recvbuff[%d] = %d\n", i, h_recvbuff[i]);
-    //}
-    //cudaMemcpy((void*)(info->recvbuff), (void*)(info->tempbuff2), info->count, cudaMemcpyHostToHost); 
-
     return ret;
   } else {
     NCCLCHECK(PtrCheck(info->comm, info->opName, "comm"));
@@ -646,7 +648,6 @@ end:
     NCCLCHECK(ncclBarrierEnqueue(info->comm));
     NCCLCHECK(ncclBarrierEnqueueWait(info->comm));
     NCCLCHECK(ncclEnqueueEvents(info->comm));
-
     
     //float a[8] = {1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0};
     //cudaMemcpy(info->recvbuff, a, 8, cudaMemcpyDefault);
@@ -661,8 +662,9 @@ end:
 
     //adding an environment variable    
     //cudaMemcpy(info->recvbuff, info->tempbuff2, info->count, cudaMemcpyDeviceToDevice);
-    //CUDACHECK(cudaFree(info->tempbuff1));
-    //CUDACHECK(cudaFree(info->tempbuff2));
+
+    CUDACHECK(cudaFree(info->tempbuff1));
+    CUDACHECK(cudaFree(info->tempbuff3));
 
     //CUDACHECK(cudaFree((void*)info->compressedbuff1));
     //CUDACHECK(cudaFree(info->compressedbuff2));

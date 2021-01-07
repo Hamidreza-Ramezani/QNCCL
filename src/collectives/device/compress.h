@@ -398,11 +398,9 @@ __device__ void dequantize(unsigned char* input_data, float* output, int num_ele
   unsigned char* input;
   const int meta_multiplier = 2;
   input = input_data + meta_multiplier * sizeof(float) * num_buckets;
-  //if (rank == 0 && id == 4) {
-  //  printf("in device0 the input is\n");
-  //  for (int i=0; i<8; ++i) {
-  //     printf("%u\n", input[i]);
-  //  }
+  //if (rank == 0 && tid == 0 && blockIdx.x == 0) {
+  //  printf("in device0 the blockDim.z is %d\n", blockDim.z);
+  //  printf("in device0 the threadIdx.z is %d\n", threadIdx.z);
   //}
 
   int num_char = (BITS * num_elems + PACK_SIZE - 1) / PACK_SIZE;
