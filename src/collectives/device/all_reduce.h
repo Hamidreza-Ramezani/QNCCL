@@ -85,15 +85,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //     printf("in device:%d\n", ring->devUserRanks[0]);
       //     printf("offset is %d\n", offset);
       //     printf("nelem is %d\n", nelem);
-      //     //for (int i=0; i<8; i++) {
-      //     //   printf("%f- ", *(thisInput+offset+i));
-      //     //}
       //     printf("\n\n\n");
       //}
       //__syncthreads();
 
-      //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize<8>(thisInput+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+      compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+      //quantize<8>(thisInput+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
 
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 2) {
       //  printf("in the place 1\n");
@@ -112,8 +109,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //}
       //__syncthreads();
 
-      prims.send(compressed_temp+offset, nelem+meta_size);
-      //prims.send(compressed_temp+offset, nelem);
+      //prims.send(compressed_temp+offset, nelem+meta_size);
+      prims.send(compressed_temp+offset, nelem);
 
       //prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
@@ -139,9 +136,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
         float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-        prims.recv(compressed_temp + offset, nelem+meta_size);
+        prims.recv(compressed_temp+offset, nelem);
 
-        //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
+        decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
 
         // __syncthreads();
         // if (tid == 0 && blockIdx.x == 0 && j == 2 && ring->devUserRanks[0] == 1) { 
@@ -153,7 +150,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         // }
         // __syncthreads();
 
-        dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], j);
+        //dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], j);
 
         //__syncthreads();
         //if (tid == 0 && blockIdx.x == 0 && j == 2 && ring->devUserRanks[0] == 0) { 
@@ -201,21 +198,22 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //  printf("\n\n\n");
         //}
         //__syncthreads();
-       // __syncthreads();
-       // if(tid == 0 && blockIdx.x == 0 && j==3) {
-       //    //int count = 0;
-       //    //for (int i=0; i<size; i++) {
-       //    //  if(abs(decompressed_temp[i] - 7.2f) > 0.00001)
-       //    //     count++;
-       //    //}
-       //    printf("count inside the kernel is %d\n", count);
-       // }
-       // __syncthreads();
 
-        //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-        quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+        // __syncthreads();
+        // if(tid == 0 && blockIdx.x == 0 && j==3) {
+        //    //int count = 0;
+        //    //for (int i=0; i<size; i++) {
+        //    //  if(abs(decompressed_temp[i] - 7.2f) > 0.00001)
+        //    //     count++;
+        //    //}
+        //    printf("count inside the kernel is %d\n", count);
+        // }
+        // __syncthreads();
 
-        prims.send(compressed_temp + offset, nelem+meta_size);
+        compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+        //quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+
+        prims.send(compressed_temp + offset, nelem);
         //prims.recvReduceSend(thisInput+offset, nelem);
       }
       chunk = ring->devUserRanks[0];
@@ -237,9 +235,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
       float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-      prims.directRecv(compressed_temp + offset , offset, nelem+meta_size);
+      prims.directRecv(compressed_temp+offset, offset, nelem);
 
-      //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
+      decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
 
       //__syncthreads();
       //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0]==0) { 
@@ -249,7 +247,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //}
       //__syncthreads();
 
-      dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 4);
+      //dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 4);
       //__syncthreads();
       //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0]==0) { 
       //  printf("the output of decompression in device0:\n");
@@ -275,14 +273,14 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //__syncthreads();
 
 
-      //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+      compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
+      //quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
       __syncthreads();
-      //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 5);
+      decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
+      //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 5);
 
       //prims.copySend(compressed_temp+offset, compressedOutput+offset, nelem+meta_size);
-      prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
+      prims.copySend(compressed_temp+offset, compressed_temp+offset, nelem);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
       // k-2 steps: copy to next GPU
@@ -304,10 +302,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //__syncthreads();
 
         //prims.directRecvCopySend(compressedOutput+offset, offset, nelem+meta_size);
-        prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
-        //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
+        prims.directRecvCopySend(compressed_temp+offset, offset, nelem);
+        decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
         //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
-        dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
+        //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
         //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 2 && j == 1) {
         //  printf("in the place 4 j %d\n", j);
         //  printf("in device:%d\n", ring->devUserRanks[0]);
@@ -350,10 +348,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       //prims.directRecv(compressedOutput+offset, offset, nelem+meta_size);
-      prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
-      //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
+      prims.directRecv(compressed_temp+offset, offset, nelem);
+      decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
       //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
-      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
+      //dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
 
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
       //  printf("in the place 5\n");
