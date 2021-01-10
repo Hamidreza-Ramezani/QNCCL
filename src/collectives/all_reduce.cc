@@ -47,7 +47,6 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   //cudaMemcpy(tempbuff1, (void*)a, count*sizeof(float), cudaMemcpyHostToDevice);
   //cudaMemcpy(tempbuff3, (void*)a, count*sizeof(float), cudaMemcpyHostToDevice);
 
-
   //cudaMalloc(compressedbuff_ptr1, nbytes);
   //cudaMalloc(compressedbuff_ptr2, nbytes);
   //cudaMemset((void*)compressedbuff1, 1, nbytes);
