@@ -37,8 +37,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   struct ncclDevComm* comm = args->comm;
   struct ncclChannel* channel = comm->channels+blockIdx.x;
   struct ncclRing* ring = &channel->ring;
-  const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / NCCL_STEPS;
-  //const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / (sizeof(T)*NCCL_STEPS);
+  //const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / NCCL_STEPS;
+  const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / (sizeof(T)*NCCL_STEPS);
   const int chunkSize = stepSize * ALLREDUCE_CHUNKSTEPS;
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
@@ -51,12 +51,15 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
     unsigned char * __restrict__ compressedOutput = (unsigned char*)args->tempbuff2;
 
     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, unsigned char, 1, 1, 1, FuncSum<unsigned char>>
-      prims(tid, nthreads, &ring->prev, &ring->next, compressedOutput, stepSize, channel, comm);
+      prims(tid, nthreads, &ring->prev, &ring->next, compressedOutput, stepSize*4, channel, comm);
 
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
+      //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+      //  printf("Hello world from new kernel\n");
+      //}
       ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
-      ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t));
-      //ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
+      //ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t));
+      ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
       ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
       //  printf("stepSize %d\n", stepSize);
@@ -80,14 +83,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
 
       //if(tid == 0 && blockIdx.x == 0) {
-      //     printf("in the place 1\n");
-      //     printf("in device:%d\n", ring->devUserRanks[0]);
-      //     printf("offset is %d\n", offset);
-      //     printf("nelem is %d\n", nelem);
-      //     //for (int i=0; i<8; i++) {
-      //     //   printf("%f- ", *(thisInput+offset+i));
-      //     //}
-      //     printf("\n\n\n");
+      //   printf("in the place 1\n");
+      //   printf("in device:%d\n", ring->devUserRanks[0]);
+      //   printf("offset is %d\n", offset);
+      //   printf("nelem is %d\n", nelem);
+      //   printf("\n\n\n");
       //}
       //__syncthreads();
 
@@ -280,8 +280,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 5);
 
       //prims.copySend(compressed_temp+offset, compressedOutput+offset, nelem+meta_size);
-      //prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
-      prims.send(compressed_temp + offset, nelem+meta_size);
+      prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
+      //prims.send(compressed_temp + offset, nelem+meta_size);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
       // k-2 steps: copy to next GPU
@@ -303,9 +303,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //__syncthreads();
 
         //prims.directRecvCopySend(compressedOutput+offset, offset, nelem+meta_size);
-        //prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
-        prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
-        prims.send(compressed_temp+offset, nelem+meta_size);
+        prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
+        //////prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
+        //////prims.send(compressed_temp+offset, nelem+meta_size);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
         //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
         dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
@@ -625,6 +625,9 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
     prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
   for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
+    if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+      printf("Hello world from old kernel\n");
+    }
     ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
     ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
     ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
@@ -639,13 +642,14 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
 
-    //if(threadIdx.x == 0 && blockIdx.x == 0) {
-    //  int sliceSize = stepSize*ALLREDUCE_SLICESTEPS;
-    //  int dataSize = max(DIVUP(nelem, 16*ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS)*16, sliceSize/32);
-    //  int realSize = max(0, min(dataSize, nelem-offset));
-    //  int a = realSize * sizeof(thisInput[0]);
-    //  printf("%d number of bytes is communicated in original NCCL\n", a);
+    //if(tid == 0 && blockIdx.x == 0) {
+    //   printf("in the place 1\n");
+    //   printf("in device:%d\n", ring->devUserRanks[0]);
+    //   printf("offset is %d\n", offset);
+    //   printf("nelem is %d\n", nelem);
+    //   printf("\n\n\n");
     //}
+    //__syncthreads();
 
     prims.send(thisInput+offset, nelem);
     for (int j=2; j<nranks; ++j) {
@@ -653,6 +657,15 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
       
+      //if(tid == 0 && blockIdx.x == 0) {
+      //   printf("in the place 2 and j %d\n", j);
+      //   printf("in device:%d\n", ring->devUserRanks[0]);
+      //   printf("offset is %d\n", offset);
+      //   printf("nelem is %d\n", nelem);
+      //   printf("\n\n\n");
+      //}
+      //__syncthreads();
+
       //prims.recv(thisOutput+offset, nelem);
       //prims.send(thisInput+offset, nelem);
       prims.recvReduceSend(thisInput+offset, nelem);
@@ -663,6 +676,15 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
     chunk = ring->devUserRanks[0];
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
+    
+    //if(tid == 0 && blockIdx.x == 0) {
+    //   printf("in the place 3\n");
+    //   printf("in device:%d\n", ring->devUserRanks[0]);
+    //   printf("offset is %d\n", offset);
+    //   printf("nelem is %d\n", nelem);
+    //   printf("\n\n\n");
+    //}
+    //__syncthreads();
 
     //prims.directRecv(thisOutput+offset, offset, nelem);
     //prims.copySend(thisInput+offset, thisOutput+offset, nelem);
@@ -675,6 +697,16 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
+
+      //if(tid == 0 && blockIdx.x == 0) {
+      //   printf("in the place 4 and j %d\n", j);
+      //   printf("in device:%d\n", ring->devUserRanks[0]);
+      //   printf("offset is %d\n", offset);
+      //   printf("nelem is %d\n", nelem);
+      //   printf("\n\n\n");
+      //}
+      //__syncthreads();
+
       prims.directRecvCopySend(thisOutput+offset, offset, nelem);
     }
 
@@ -682,6 +714,16 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
     chunk = ring->devUserRanks[1];
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
+
+
+    //if(tid == 0 && blockIdx.x == 0) {
+    //   printf("in the place 3\n");
+    //   printf("in device:%d\n", ring->devUserRanks[0]);
+    //   printf("offset is %d\n", offset);
+    //   printf("nelem is %d\n", nelem);
+    //   printf("\n\n\n");
+    //}
+    //__syncthreads();
 
     // Final wait/copy.
     prims.directRecv(thisOutput+offset, offset, nelem);
