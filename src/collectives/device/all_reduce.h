@@ -37,7 +37,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   struct ncclDevComm* comm = args->comm;
   struct ncclChannel* channel = comm->channels+blockIdx.x;
   struct ncclRing* ring = &channel->ring;
-  //const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / NCCL_STEPS;
   const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / (sizeof(T)*NCCL_STEPS);
   const int chunkSize = stepSize * ALLREDUCE_CHUNKSTEPS;
   const int nranks = comm->nRanks;
@@ -54,18 +53,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       prims(tid, nthreads, &ring->prev, &ring->next, compressedOutput, stepSize*4, channel, comm);
 
     for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
-      //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-      //  printf("Hello world from new kernel\n");
-      //}
       ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
-      //ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t));
       ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
       ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
-      //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-      //  printf("stepSize %d\n", stepSize);
-      //  printf("\n\n\n");
-      //}
-      //__syncthreads();
 
       /////////////// begin AllReduce steps ///////////////
       ssize_t offset;
@@ -94,10 +84,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
       quantize<8>(thisInput+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
 
-      //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 2) {
+      //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1 && gridOffset == 29360128) {
       //  printf("in the place 1\n");
       //  printf("in device:%d\n", ring->devUserRanks[0]);
-      //  printf("thisInput[524288] = %f\n", thisInput[524288]);
+      //  printf("thisInput[31981567] = %f\n", thisInput[31981567]);
       //  printf("\n\n\n");
       //}
       //__syncthreads();
@@ -184,31 +174,33 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
           decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
         }
 
-        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 3 && j == 2) {
+        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 2 && j == 2 && gridOffset == 29360128) {
         //  printf("in the place 2 j %d\n", j);
         //  printf("in device:%d\n", ring->devUserRanks[0]);
-        //  printf("decompressed_temp[524288] = %f\n", decompressed_temp[524288]);
+        //  printf("decompressed_temp[31981567] = %f\n", decompressed_temp[31981567]);
         //  printf("\n\n\n");
         //}
         //__syncthreads();
 
-        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0 && j == 3) {
+        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 3 && j == 3 && gridOffset == 29360128) {
         //  printf("in the place 2 j %d\n", j);
         //  printf("in device:%d\n", ring->devUserRanks[0]);
-        //  printf("decompressed_temp[524288] = %f\n", decompressed_temp[524288]);
+        //  printf("decompressed_temp[31981567] = %f\n", decompressed_temp[31981567]);
         //  printf("\n\n\n");
         //}
         //__syncthreads();
-       // __syncthreads();
-       // if(tid == 0 && blockIdx.x == 0 && j==3) {
-       //    //int count = 0;
-       //    //for (int i=0; i<size; i++) {
-       //    //  if(abs(decompressed_temp[i] - 7.2f) > 0.00001)
-       //    //     count++;
-       //    //}
-       //    printf("count inside the kernel is %d\n", count);
-       // }
-       // __syncthreads();
+
+
+        // __syncthreads();
+        // if(tid == 0 && blockIdx.x == 0 && j==3) {
+        //    //int count = 0;
+        //    //for (int i=0; i<size; i++) {
+        //    //  if(abs(decompressed_temp[i] - 7.2f) > 0.00001)
+        //    //     count++;
+        //    //}
+        //    printf("count inside the kernel is %d\n", count);
+        // }
+        // __syncthreads();
 
         //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
         quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
@@ -264,10 +256,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //thisOutput[idx] = decompressed_temp[idx];
       }
 
-      //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1) {
+      //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0 && gridOffset == 29360128) {
       //  printf("in the place 3\n");
       //  printf("in device:%d\n", ring->devUserRanks[0]);
-      //  printf("decompressed_temp[524288] = %f\n", decompressed_temp[524288]);
+      //  printf("decompressed_temp[31981567] = %f\n", decompressed_temp[31981567]);
       //  printf("\n\n\n");
       //}
       //__syncthreads();
@@ -309,18 +301,18 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
         //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
         dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 6);      
-        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 2 && j == 1) {
+        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1 && j == 1 && gridOffset == 29360128) {
         //  printf("in the place 4 j %d\n", j);
         //  printf("in device:%d\n", ring->devUserRanks[0]);
-        //  printf("thisOutput[524288] = %f\n", thisOutput[524288]);
+        //  printf("thisOutput[31981567] = %f\n", thisOutput[31981567]);
         //  printf("\n\n\n");
         //}
         //__syncthreads();
 
-        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 3 && j == 2) {
+        //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 2 && j == 2 && gridOffset == 29360128) {
         //  printf("in the place 4 j %d\n", j);
         //  printf("in device:%d\n", ring->devUserRanks[0]);
-        //  printf("thisOutput[524288] = %f\n", thisOutput[524288]);
+        //  printf("thisOutput[31981567] = %f\n", thisOutput[31981567]);
         //  printf("\n\n\n");
         //}
         //__syncthreads();
@@ -356,10 +348,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
       dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads, ring->devUserRanks[0], 7);
 
-      //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+      //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 3 && gridOffset == 29360128) {
       //  printf("in the place 5\n");
       //  printf("in device:%d\n", ring->devUserRanks[0]);
-      //  printf("thisOutput[524288] = %f\n", thisOutput[524288]);
+      //  printf("thisOutput[31981567] = %f\n", thisOutput[31981567]);
       //  printf("\n\n\n");
       //}
       //__syncthreads();
@@ -616,6 +608,9 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
 
+  //if (tid ==0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+  //  printf("in old kernel nthreads is %d\n", nthreads);
+  //}
 
   // Compute pointers
   const T * __restrict__ thisInput = (const T*)args->sendbuff;
