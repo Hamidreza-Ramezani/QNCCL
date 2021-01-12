@@ -281,7 +281,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       //prims.copySend(compressed_temp+offset, compressedOutput+offset, nelem+meta_size);
       prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
-      //prims.send(compressed_temp + offset, nelem+meta_size);
+      //////prims.send(compressed_temp + offset, nelem+meta_size);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
       // k-2 steps: copy to next GPU
@@ -625,9 +625,9 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
     prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
   for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
-    if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-      printf("Hello world from old kernel\n");
-    }
+    //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+    //  printf("Hello world from old kernel\n");
+    //}
     ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
     ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
     ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
