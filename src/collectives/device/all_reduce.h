@@ -58,14 +58,13 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
       ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
 
-      //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-      //  printf("\nrealChunkSize %d\n", realChunkSize);
-      //}
-
       /////////////// begin AllReduce steps ///////////////
       ssize_t offset;
       int nelem;
       int chunk;
+
+      ssize_t compressed_offset;
+
 
       //step 0: push data to next GPU
       chunk = ring->devUserRanks[nranks-1];
@@ -74,6 +73,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       int num_buckets = DIVUP(nelem, bucket_size);
       size_t meta_size = 2 * sizeof(float) * num_buckets;
+
+      int pre_num_buckets = DIVUP(offset, bucket_size);
+      size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+      compressed_offset = offset+pre_meta_size;
+
 
       unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
 
@@ -87,7 +91,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //__syncthreads();
 
       //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize<8>(thisInput+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+      quantize<8>(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
 
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1 && gridOffset == 29360128) {
       //  printf("in the place 1\n");
@@ -106,7 +110,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //}
       //__syncthreads();
 
-      prims.send(compressed_temp+offset, nelem+meta_size);
+      prims.send(compressed_temp+compressed_offset, nelem+meta_size);
 
       //prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
@@ -119,6 +123,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
         num_buckets = DIVUP(nelem, bucket_size);
         meta_size = 2 * sizeof(float) * num_buckets;   
+      int pre_num_buckets = DIVUP(offset, bucket_size);
+      size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+      compressed_offset = offset+pre_meta_size;
 
         //if(tid == 0 && blockIdx.x == 0) {
         //  printf("in the place 2 and j %d\n", j);
@@ -132,7 +139,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
         float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-        prims.recv(compressed_temp + offset, nelem+meta_size);
+        prims.recv(compressed_temp+compressed_offset, nelem+meta_size);
 
         //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
 
@@ -146,7 +153,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         // }
         // __syncthreads();
 
-        dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+        dequantize<true,8>(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
 
         //__syncthreads();
         //if (tid == 0 && blockIdx.x == 0 && j == 2 && ring->devUserRanks[0] == 0) { 
@@ -208,9 +215,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //__syncthreads();
 
         //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-        quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+        quantize<8>(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
 
-        prims.send(compressed_temp + offset, nelem+meta_size);
+        prims.send(compressed_temp+compressed_offset, nelem+meta_size);
         //prims.recvReduceSend(thisInput+offset, nelem);
       }
       chunk = ring->devUserRanks[0];
@@ -219,6 +226,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       num_buckets = DIVUP(nelem, bucket_size);
       meta_size = 2 * sizeof(float) * num_buckets;   
+      pre_num_buckets = DIVUP(offset, bucket_size);
+      pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+      compressed_offset = offset+pre_meta_size;
 
       //if(tid == 0 && blockIdx.x == 0) {
       //  printf("in the place 3\n");
@@ -232,7 +242,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
       float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-      prims.directRecv(compressed_temp + offset , offset, nelem+meta_size);
+      prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem+meta_size);
 
       //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
 
@@ -244,7 +254,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //}
       //__syncthreads();
 
-      dequantize<true,8>(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+      dequantize<true,8>(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
       //__syncthreads();
       //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0]==0) { 
       //  printf("the output of decompression in device0:\n");
@@ -271,13 +281,13 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
 
       //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize<8>(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+      quantize<8>(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
       __syncthreads();
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
+      dequantize<true,8>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
 
       //prims.copySend(compressed_temp+offset, compressedOutput+offset, nelem+meta_size);
-      prims.copySend(compressed_temp + offset, compressed_temp + offset, nelem+meta_size);
+      prims.copySend(compressed_temp+compressed_offset, compressed_temp+compressed_offset, nelem+meta_size);
       //////prims.send(compressed_temp + offset, nelem+meta_size);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
@@ -289,6 +299,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
         num_buckets = DIVUP(nelem, bucket_size);
         meta_size = 2 * sizeof(float) * num_buckets;   
+      int pre_num_buckets = DIVUP(offset, bucket_size);
+      size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+      compressed_offset = offset+pre_meta_size;
 
         //if(tid == 0 && blockIdx.x == 0) {
         //  printf("in the place 4 and j %d \n", j);
@@ -300,12 +313,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //__syncthreads();
 
         //prims.directRecvCopySend(compressedOutput+offset, offset, nelem+meta_size);
-        prims.directRecvCopySend(compressed_temp+offset, offset, nelem+meta_size);
+        prims.directRecvCopySend(compressed_temp+compressed_offset, compressed_offset, nelem+meta_size);
         //////prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
         //////prims.send(compressed_temp+offset, nelem+meta_size);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
         //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);      
-        dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);    
+        dequantize<true,8>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);    
 
         //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1 && j == 1 && gridOffset == 29360128) {
         //  printf("in the place 4 j %d\n", j);
@@ -337,6 +350,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       num_buckets = DIVUP(nelem, bucket_size);
       meta_size = 2 * sizeof(float) * num_buckets;   
+      pre_num_buckets = DIVUP(offset, bucket_size);
+      pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+      compressed_offset = offset+pre_meta_size;
 
       //if(tid == 0 && blockIdx.x == 0) {
       //  printf("in the place 5\n");
@@ -349,10 +365,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       //prims.directRecv(compressedOutput+offset, offset, nelem+meta_size);
-      prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
+      prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem+meta_size);
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
       //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
-      dequantize<true,8>(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
+      dequantize<true,8>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
 
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 3 && gridOffset == 29360128) {
       //  printf("in the place 5\n");
