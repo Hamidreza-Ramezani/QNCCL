@@ -383,7 +383,7 @@ inline __device__ float MaxMinDecodeValue(unsigned char input, float* meta_info,
 }
 
 template <bool ADD, int BITS>
-__device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int nthreads, int rank, int id) {
+__device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int nthreads) {
   //if (num_elems < 0) { 
   // num_elems = 0; 
   //}  
