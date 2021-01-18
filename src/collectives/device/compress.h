@@ -159,12 +159,12 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
 
 template <int BITS>
 __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int bucket_size, int nthreads) {
-  //int index = threadIdx.x + blockIdx.x * blockDim.x;
-  //int stride = gridDim.x * blockDim.x;
+  //int index = threadIdx.x + blockIdx.x * (blockDim.x-32);
+  //int stride = gridDim.x * (blockDim.x-32);
   int index = threadIdx.x;
   int stride = blockDim.x -32;
-  
-  if (index <stride) {
+
+  if (threadIdx.x < blockDim.x-32) {
      const int divisor = (1 << BITS) - 1;
      float* meta_buf = (float*)meta;
      for (int i = index; i < (num_elem + bucket_size - 1) / bucket_size; i += stride) {
@@ -181,42 +181,79 @@ __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int
   __syncthreads();
 }
 
+//template <int BITS>
+//__device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
+//  int tid = threadIdx.x;
+//  int block_size = blockDim.x-32;
+//
+//  float* meta_buf = (float*)meta;
+//  const int MAX_NTHREADS = 544;
+//  const int shared_size = MAX_NTHREADS * 2;
+//  //__shared__ float sdata[shared_size];
+//  extern __shared__ float sdata[];
+//
+//  meta_buf[0] = input[0];
+//  meta_buf[1] = input[0];
+//
+//  if (tid < num_elems) {
+//      sdata[tid] = input[tid];
+//      sdata[block_size + tid] = input[tid];
+//  }
+//  __syncthreads();
+//
+//  for (int s = block_size / 2; s > 0; s >>= 1) {
+//    if (tid < s && tid + s < num_elems) {
+//      sdata[tid] = fmaxf(sdata[tid + s], sdata[tid]);
+//      sdata[block_size + tid] =
+//          fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
+//    }
+//  }
+//  __syncthreads();
+//
+//  if (tid == 0) {
+//      const int divisor = (1 << BITS) - 1;
+//      meta_buf[0] = (sdata[0] - sdata[block_size]) / divisor;
+//      meta_buf[1] = sdata[block_size];
+//  }
+//  __syncthreads();
+//}
+
+
 template <int BITS>
-__device__ void find_meta_parallel(float* input, float* meta, int num_elems, int nthreads) {
+__device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
   int tid = threadIdx.x;
   int block_size = blockDim.x-32;
-
   float* meta_buf = (float*)meta;
-  const int MAX_NTHREADS = 288;
-  const int shared_size = MAX_NTHREADS * 2;
-  __shared__ float sdata[shared_size];
+  extern __shared__ float sdata[];
   meta_buf[0] = input[0];
   meta_buf[1] = input[0];
+  int num_iters_per_bucket = (num_elems + block_size - 1) / block_size;
+  for (int i = 0; i < num_iters_per_bucket; i++) {
+    int idx = i * block_size + tid;
+    if (idx < num_elems) {
+        sdata[tid] = input[idx];
+        sdata[block_size + tid] = input[idx];
+    }
+    __syncthreads();
 
-  if (tid < num_elems) {
-      sdata[tid] = input[tid];
-      sdata[block_size + tid] = input[tid];
-  }
-  __syncthreads();
+    for (int s = block_size / 2; s > 0; s >>= 1) {
+      if (tid < s && idx + s < num_elems) {
+        sdata[tid] = fmaxf(sdata[tid + s], sdata[tid]);
+        sdata[block_size + tid] =
+            fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
+      }
+    }
+    __syncthreads();
 
-  for (int s = block_size / 2; s > 0; s >>= 1) {
-    if (tid < s && tid + s < num_elems) {
-      sdata[tid] = fmaxf(sdata[tid + s], sdata[tid]);
-      sdata[block_size + tid] =
-          fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
+    if (tid == 0) {
+        meta_buf[0] = fmaxf(meta_buf[0], sdata[tid]);
+        meta_buf[1] = fminf(meta_buf[1], sdata[block_size + tid]);
     }
   }
-  __syncthreads();
-
-  //if (tid == 0) {
-  //    meta_buf[0] = fmaxf(meta_buf[0], sdata[tid]);
-  //    meta_buf[1] = fminf(meta_buf[1], sdata[block_size + tid]);
-  //}
-
+  
   if (tid == 0) {
       const int divisor = (1 << BITS) - 1;
-      meta_buf[0] = (sdata[0] - sdata[block_size]) / divisor;
-      meta_buf[1] = sdata[block_size];
+      meta_buf[0] = (meta_buf[0] - meta_buf[1]) / divisor;
   }
   __syncthreads();
 }
@@ -279,7 +316,7 @@ __device__ void quantize(float* input_data, unsigned char* output_data, int num_
   find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
   //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
   //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-  //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, nthreads);
+  //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
   //}
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
@@ -312,7 +349,7 @@ __device__ void quantize(const float* input_data, unsigned char* output_data, in
   find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
   //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
   //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-  //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, nthreads);
+  //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
   //}
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
@@ -335,12 +372,13 @@ inline __device__ float MaxMinDecodeValue(unsigned char input, float* meta_info,
 
 template <bool ADD, int BITS>
 __device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int nthreads) {
-  //int tid = threadIdx.x + blockIdx.x * blockDim.x;
-  //int stride = gridDim.x * blockDim.x;
+  //int tid = threadIdx.x + blockIdx.x * (blockDim.x-32);
+  //int stride = gridDim.x * (blockDim.x-32);
   int tid = threadIdx.x;
   int stride = blockDim.x -32;
   
-  if (tid<stride) {
+  //if (tid<stride) {
+  if (threadIdx.x<blockDim.x -32) {
     int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
     float* meta_info = (float*)input_data;
     unsigned char* input;

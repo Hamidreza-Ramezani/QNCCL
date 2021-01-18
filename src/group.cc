@@ -153,6 +153,7 @@ ncclResult_t ncclGroupEnd() {
   if (ncclGroupMode > 0) return ncclSuccess;
   int savedDev;
   CUDACHECK(cudaGetDevice(&savedDev));
+
   int activeThreads = 0;
   int doneArray[MAX_ASYNC_OPS];
   for (int i=0; i<ncclGroupIndex; i++) doneArray[i] = 1;
