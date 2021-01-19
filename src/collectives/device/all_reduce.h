@@ -62,7 +62,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       ssize_t offset;
       int nelem;
       int chunk;
-      int nelem2;
+      int nelem_compressed;
 
       ssize_t compressed_offset;
 
@@ -90,7 +90,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //__syncthreads();
 
       //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize<4>(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
+      quantize<2>(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
 
 
       //__syncthreads();
@@ -123,8 +123,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //}
       //__syncthreads();
       
-      nelem2 = DIVUP(nelem, 2);
-      prims.send(compressed_temp+compressed_offset, nelem/2+meta_size);
+      nelem_compressed = DIVUP(nelem, 2);
+      prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
 
       //prims.send(temp2+offset, nelem);
       //prims.send(thisInput+offset, nelem);
@@ -153,8 +153,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
         float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-        nelem2 = DIVUP(nelem, 2);
-        prims.recv(compressed_temp+compressed_offset, nelem/2+meta_size);
+        nelem_compressed = DIVUP(nelem, 2);
+        prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
 
         //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
 
@@ -168,7 +168,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         // }
         // __syncthreads();
 
-        dequantize<true,4>(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+        dequantize<true,2>(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
 
         //__syncthreads();
         //if (tid == 0 && blockIdx.x == 0 && j == 2 && ring->devUserRanks[0] == 0) { 
@@ -230,10 +230,10 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //__syncthreads();
 
         //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-        quantize<4>(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
+        quantize<2>(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
 
-        nelem2 = DIVUP(nelem, 2);
-        prims.send(compressed_temp+compressed_offset, nelem/2+meta_size);
+        nelem_compressed = DIVUP(nelem, 2);
+        prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
         //prims.recvReduceSend(thisInput+offset, nelem);
       }
       chunk = ring->devUserRanks[0];
@@ -258,8 +258,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //unsigned char* __restrict__ compressed_temp = (unsigned char*)args->tempbuff1;
       float * __restrict__ decompressed_temp = (float*)args->tempbuff3;
 
-        nelem2 = DIVUP(nelem, 2);
-      prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem/2+meta_size);
+      nelem_compressed = DIVUP(nelem, 2);
+      prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
 
       //decompress(compressed_temp+offset, decompressed_temp+offset, nelem, args->coll.nThreads);
 
@@ -277,7 +277,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //}
       //__syncthreads();
 
-      dequantize<true,4>(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
+      dequantize<true,2>(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, args->coll.nThreads);
 
       //__syncthreads();
       //if(tid == 0 && blockIdx.x == 1 && ring->devUserRanks[0] == 0) {
@@ -306,15 +306,15 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
 
       //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize<4>(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
+      quantize<2>(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, args->coll.nThreads);
       //__syncthreads();
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      //dequantize<true,4>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
+      //dequantize<true,2>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
 
       //prims.copySend(compressed_temp+offset, compressedOutput+offset, nelem+meta_size);
       //////prims.copySend(compressed_temp+compressed_offset, compressed_temp+compressed_offset, nelem+meta_size);
-        nelem2 = DIVUP(nelem, 2);
-      prims.send(compressed_temp+compressed_offset, nelem/2+meta_size);
+      nelem_compressed = DIVUP(nelem, 2);
+      prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
       //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
       // k-2 steps: copy to next GPU
@@ -339,12 +339,13 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //__syncthreads();
 
         //prims.directRecvCopySend(compressedOutput+offset, offset, nelem+meta_size);
-        prims.directRecvCopySend(compressed_temp+compressed_offset, compressed_offset, nelem/2+meta_size);
+        nelem_compressed = DIVUP(nelem, 2);
+        prims.directRecvCopySend(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
         //////prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
         //////prims.send(compressed_temp+offset, nelem+meta_size);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-        //dequantize<true,4>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);      
-        dequantize<true,4>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);    
+        //dequantize<true,2>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);      
+        dequantize<true,2>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);    
 
         //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1 && j == 1 && gridOffset == 29360128) {
         //  printf("in the place 4 j %d\n", j);
@@ -391,11 +392,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       // Final wait/copy.
       //prims.directRecv(compressedOutput+offset, offset, nelem+meta_size);
-        nelem2 = DIVUP(nelem, 2);
-      prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem/2+meta_size);
+      nelem_compressed = DIVUP(nelem, 2);
+      prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      //dequantize<true,4>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
-      dequantize<true,4>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
+      //dequantize<true,2>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
+      dequantize<true,2>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);
 
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 3 && gridOffset == 29360128) {
       //  printf("in the place 5\n");
