@@ -239,23 +239,22 @@ __device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
     for (int s = block_size / 2; s > 0; s >>= 1) {
       if (tid < s && idx + s < num_elems) {
         sdata[tid] = fmaxf(sdata[tid + s], sdata[tid]);
-        sdata[block_size + tid] =
-            fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
+        sdata[block_size + tid] = fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
       }
+    //__syncthreads();
     }
-    __syncthreads();
 
     if (tid == 0) {
         meta_buf[0] = fmaxf(meta_buf[0], sdata[tid]);
         meta_buf[1] = fminf(meta_buf[1], sdata[block_size + tid]);
     }
   }
-  
+
   if (tid == 0) {
       const int divisor = (1 << BITS) - 1;
       meta_buf[0] = (meta_buf[0] - meta_buf[1]) / divisor;
   }
-  __syncthreads();
+  //__syncthreads();
 }
 
 inline __device__ unsigned char
@@ -313,11 +312,11 @@ __device__ void quantize(float* input_data, unsigned char* output_data, int num_
   int compressed_size = (bucket_size * BITS + PACK_SIZE - 1) / PACK_SIZE;
 
   float* input = (float*)input_data;
-  find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
-  //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
-  //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-  //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
-  //}
+  //find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
+  for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
+    cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
+    find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
+  }
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
     CompressBucket<BITS>(
@@ -346,11 +345,11 @@ __device__ void quantize(const float* input_data, unsigned char* output_data, in
   int compressed_size = (bucket_size * BITS + PACK_SIZE - 1) / PACK_SIZE;
 
   float* input = (float*)input_data;
-  find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
-  //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
-  //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-  //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
-  //}
+  //find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
+  for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
+    cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
+    find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
+  }
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
     CompressBucket<BITS>(
