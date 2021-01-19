@@ -13,7 +13,6 @@
 #include <compress.h>
 #include <type_traits>
 
-
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
 template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
 
@@ -73,6 +72,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       int num_buckets = DIVUP(nelem, bucket_size);
       size_t meta_size = 2 * sizeof(float) * num_buckets;
+
+      //if (tid == 0 && ring->devUserRanks[0] == 0) {     
+      //   printf("bid = %d\n", blockIdx.x);
+      //   printf("num_buckets = %d\n", num_buckets);
+      //}
 
       int pre_num_buckets = DIVUP(offset, bucket_size);
       size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
@@ -139,6 +143,12 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         int pre_num_buckets = DIVUP(offset, bucket_size);
         size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
         compressed_offset = offset+pre_meta_size;
+
+        
+        //if (tid == 0 && ring->devUserRanks[0] == 0 && j == 2) {
+        //   printf("bid = %d\n", blockIdx.x);
+        //   printf("num_buckets = %d\n", num_buckets);
+        //}
 
         //if(tid == 0 && blockIdx.x == 0) {
         //  printf("in the place 2 and j %d\n", j);

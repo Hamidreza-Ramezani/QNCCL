@@ -83,6 +83,7 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
     cudaProfilerStart();
     //size_t heapSize = 128 * 1024 * 1024;
     //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
+    size_t a = 128*1024*1024;
     CUDACHECK(cudaLaunchCooperativeKernelMultiDevice(paramsList, numDevices,
             // These flags are to reduce the latency of using this API
             cudaCooperativeLaunchMultiDeviceNoPreSync|cudaCooperativeLaunchMultiDeviceNoPostSync));
@@ -662,6 +663,8 @@ end:
 
     //adding an environment variable    
     //cudaMemcpy(info->recvbuff, info->tempbuff2, info->count, cudaMemcpyDeviceToDevice);
+    //cudaPrintfDisplay(stdout, true);
+    //cudaPrintfEnd();
 
     CUDACHECK(cudaFree(info->tempbuff1));
     CUDACHECK(cudaFree(info->tempbuff3));

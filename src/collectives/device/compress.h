@@ -220,7 +220,7 @@ __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int
 
 
 template <int BITS>
-__device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
+inline __device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
   int tid = threadIdx.x;
   int block_size = blockDim.x-32;
   float* meta_buf = (float*)meta;
@@ -241,7 +241,7 @@ __device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
         sdata[tid] = fmaxf(sdata[tid + s], sdata[tid]);
         sdata[block_size + tid] = fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
       }
-    //__syncthreads();
+    __syncthreads();
     }
 
     if (tid == 0) {
@@ -254,7 +254,7 @@ __device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
       const int divisor = (1 << BITS) - 1;
       meta_buf[0] = (meta_buf[0] - meta_buf[1]) / divisor;
   }
-  //__syncthreads();
+  __syncthreads();
 }
 
 inline __device__ unsigned char
