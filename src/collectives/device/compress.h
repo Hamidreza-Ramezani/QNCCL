@@ -158,7 +158,7 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
 
 
 template <int BITS>
-__device__ void find_meta_seq(const float* input, float* meta, int num_elem, int bucket_size, int nthreads) {
+__device__ void find_meta_seq(const float* input, float* meta, int num_elem, int bucket_size) {
   //int index = threadIdx.x + blockIdx.x * (blockDim.x-32);
   //int stride = gridDim.x * (blockDim.x-32);
   int index = threadIdx.x;
@@ -272,7 +272,7 @@ MaxMinEncodeValue(float input, float* meta_info, float rand) {
 
 
 template <int BITS>
-__device__ void CompressBucket(float* input, unsigned char* output, float* meta_info, int num_elems, int nthreads) {
+__device__ void CompressBucket(float* input, unsigned char* output, float* meta_info, int num_elems) {
   using int64_t = long long int;
   int tid = threadIdx.x;
   int num_threads = blockDim.x-32;
@@ -296,7 +296,7 @@ __device__ void CompressBucket(float* input, unsigned char* output, float* meta_
 
 
 template <int BITS>
-__device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int nthreads) {
+__device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
   int num_blocks = 1;
@@ -312,7 +312,7 @@ __device__ void quantize(float* input_data, unsigned char* output_data, int num_
   int compressed_size = (bucket_size * BITS + PACK_SIZE - 1) / PACK_SIZE;
 
   float* input = (float*)input_data;
-  find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
+  find_meta_seq<BITS>(input, meta, num_elems, bucket_size);
   //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
   //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
   //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
@@ -322,14 +322,14 @@ __device__ void quantize(float* input_data, unsigned char* output_data, int num_
     CompressBucket<BITS>(
         input + bucket_size * bucket_id, output + compressed_size * bucket_id,
         (meta + meta_multiplier * bucket_id),
-        cur_bucket_size, nthreads);
+        cur_bucket_size);
   }
   __syncthreads();
 }
 
 
 template <int BITS>
-__device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int nthreads) {
+__device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
   int num_blocks = 1;
@@ -345,7 +345,7 @@ __device__ void quantize(const float* input_data, unsigned char* output_data, in
   int compressed_size = (bucket_size * BITS + PACK_SIZE - 1) / PACK_SIZE;
 
   float* input = (float*)input_data;
-  find_meta_seq<BITS>(input, meta, num_elems, bucket_size, nthreads);
+  find_meta_seq<BITS>(input, meta, num_elems, bucket_size);
   //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
   //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
   //  find_meta_parallel<BITS>(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size);
@@ -355,7 +355,7 @@ __device__ void quantize(const float* input_data, unsigned char* output_data, in
     CompressBucket<BITS>(
         input + bucket_size * bucket_id, output + compressed_size * bucket_id,
         (meta + meta_multiplier * bucket_id),
-        cur_bucket_size, nthreads);
+        cur_bucket_size);
   }
   __syncthreads();
 }
@@ -370,7 +370,7 @@ inline __device__ float MaxMinDecodeValue(unsigned char input, float* meta_info,
 }
 
 template <bool ADD, int BITS>
-__device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int nthreads) {
+__device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size) {
   //int tid = threadIdx.x + blockIdx.x * (blockDim.x-32);
   //int stride = gridDim.x * (blockDim.x-32);
   int tid = threadIdx.x;
@@ -408,12 +408,12 @@ __device__ void dequantize(unsigned char* input_data, float* output, int num_ele
 
 
 //template <bool ADD, int BITS>
-//inline __device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int nthreads) {
+//inline __device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size) {
 //  //if (num_elems < 0) {
 //  //  num_elems = 0;
 //  //}
 //  int tid = threadIdx.x;
-//  int stride = nthreads;
+//  int stride = blockDim.x-32;
 //  int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
 //  float* meta_info = (float*)input_data;
 //  unsigned char* input; 
