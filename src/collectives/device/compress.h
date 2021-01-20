@@ -375,8 +375,7 @@ __device__ void dequantize(unsigned char* input_data, float* output, int num_ele
   //int stride = gridDim.x * (blockDim.x-32);
   int tid = threadIdx.x;
   int stride = blockDim.x -32;
-  
-  //if (tid<stride) {
+
   if (threadIdx.x<blockDim.x -32) {
     int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
     float* meta_info = (float*)input_data;

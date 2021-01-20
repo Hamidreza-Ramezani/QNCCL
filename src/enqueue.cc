@@ -397,7 +397,19 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
     coll->args.with_compression = false;
   }
 
-
+  char* quantization_size_per_entry = getenv("BITS");
+  if (quantization_size_per_entry == NULL) {
+    coll->args.BITS = 8;
+  } else {
+    coll->args.BITS = atoi(quantization_size_per_entry);
+  }
+  char* bucket_size = getenv("bucket_size");
+  if (bucket_size == NULL) {
+    coll->args.bucket_size = 1024;
+  } else {
+    coll->args.bucket_size = atoi(bucket_size);
+  }
+ 
   //cudaSetDevice(info->comm->cudaDev);
   //void** tempbuff_ptr1 = &(coll->args.tempbuff1);
   //void** tempbuff_ptr2 = &(coll->args.tempbuff2);
