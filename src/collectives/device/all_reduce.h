@@ -345,8 +345,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
         //prims.directRecvCopySend(compressedOutput+offset, offset, nelem+meta_size);
         prims.directRecvCopySend(compressed_temp+compressed_offset, compressed_offset, nelem+meta_size);
-        //////prims.directRecv(compressed_temp+offset, offset, nelem+meta_size);
-        //////prims.send(compressed_temp+offset, nelem+meta_size);
+        //////prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem+meta_size);
+        //////prims.send(compressed_temp+compressed_offset, nelem+meta_size);
         //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
         //dequantize<true,8>(compressedOutput+offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);      
         dequantize<true,8>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, args->coll.nThreads);    
