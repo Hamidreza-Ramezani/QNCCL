@@ -34,7 +34,16 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   //int header_size = 2*num_buckets; 
   //cudaMalloc(tempbuff_ptr1, header_size*sizeof(float) + nbytes/4);
 
-  int bucket_size = 1024;
+
+
+  int bucket_size;
+  char* bucket_size_str = getenv("bucket_size");
+  if (bucket_size_str == NULL) {
+    bucket_size = 1024;
+  } else {
+    bucket_size = atoi(bucket_size_str);
+  }
+
   int num_buckets = DIVUP(count, bucket_size);
   int meta_size = 2 * sizeof(float) * num_buckets;
 

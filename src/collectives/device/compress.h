@@ -242,8 +242,8 @@ __device__ void find_meta_parallel(float* input, float* meta, int num_elems) {
         sdata[block_size + tid] =
             fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
       }
-    }
     __syncthreads();
+    }
 
     if (tid == 0) {
         meta_buf[0] = fmaxf(meta_buf[0], sdata[tid]);
