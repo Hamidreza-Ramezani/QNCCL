@@ -84,6 +84,8 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
     //size_t heapSize = 128 * 1024 * 1024;
     //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
     size_t a = 128*1024*1024;
+    paramsList->gridDim.x = 64;
+
     CUDACHECK(cudaLaunchCooperativeKernelMultiDevice(paramsList, numDevices,
             // These flags are to reduce the latency of using this API
             cudaCooperativeLaunchMultiDeviceNoPreSync|cudaCooperativeLaunchMultiDeviceNoPostSync));
