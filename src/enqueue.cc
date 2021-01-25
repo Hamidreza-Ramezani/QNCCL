@@ -85,7 +85,7 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
     //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
     size_t a = 128*1024*1024;
     //paramsList->gridDim.x = 64;
-
+    printf("QNCCL is used\n");
     CUDACHECK(cudaLaunchCooperativeKernelMultiDevice(paramsList, numDevices,
             // These flags are to reduce the latency of using this API
             cudaCooperativeLaunchMultiDeviceNoPreSync|cudaCooperativeLaunchMultiDeviceNoPostSync));

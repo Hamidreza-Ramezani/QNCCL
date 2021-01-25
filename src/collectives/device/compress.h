@@ -1,6 +1,7 @@
 #include "cuda_runtime.h"
 #include "cuda.h"
 #include <stdint.h>
+#include <curand_kernel.h>
 
 #define PACK_SIZE 8
 #define EPS 1e-10

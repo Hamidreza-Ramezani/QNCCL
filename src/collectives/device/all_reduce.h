@@ -42,6 +42,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
   int bucket_size = args->bucket_size;
+  
+  if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
+     printf("QNCCL is used\n");
+  }
+  
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     //const int BITS=8;
