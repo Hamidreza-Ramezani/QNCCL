@@ -84,78 +84,30 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
 }
 
 
+inline __device__ void setup_kernel(curandState *state) {
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    /* Each thread gets same seed, a different sequence number, no offset */
+    curand_init(1234, id, 0, &state[id]);
+}
 
-////template<>
-////inline __device__ const int* compress<float>(const float* src, const int* compressedSrc, int nelem) {
-//__device__ __forceinline__ void compress(const float* src, int* compressedSrc, int offset, int nelem, int nthreads) {
-//  const int tid = threadIdx.x;
-//  for (int idx = offset+tid; idx < offset+nelem; idx += nthreads) {
-//    int var;
-//    if (src[idx] < 0) {
-//      var = static_cast<int> (src[idx] - 0.5);
-//    } else {
-//      var = static_cast<int> (src[idx] + 0.5); 
-//    }
-//    compressedSrc[idx] = var;
-//  }
-//}
-//
-//
-////template<>
-//__device__  __forceinline__ void compress(float src, int* compressedSrc, int nthreads) {
-//  if (src < 0) {
-//    *compressedSrc = static_cast<int> (src - 0.5);
-//  } else { 
-//    *compressedSrc = static_cast<int> (src + 0.5);
-//  }
-//}
+inline __device__ void generate_uniform_kernel(curandState* state, float* result) {
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    float random_number;
+    curandState localState = state[id];
+    random_number = curand_uniform(&localState);
+    state[id] = localState;
+    result[id] = random_number;
+}
 
 
-//__device__ __forceinline__ void compress(const float* src, int* compressedSrc, int offset, int nelem, int nthreads) {
-//  for (int idx = offset; idx < offset+nelem; idx += 1) {
-//    int var;
-//    if (src[idx] < 0) {
-//       var = static_cast<int> (src[idx] - 0.5);
-//    }
-//    else {
-//       var = static_cast<int> (src[idx] + 0.5); 
-//    }
-//    compressedSrc[idx] = var;
-//  }
-//}
-//
-//__device__  __forceinline__ void compress(float src, int* compressedSrc, int nthreads) {
-//  if (src < 0) {
-//     *compressedSrc = static_cast<int> (src - 0.5);
-//  }
-//  else { 
-//  *compressedSrc = static_cast<int> (src + 0.5);
-//  }
-//}
-
-
-
-//__device__ __forceinline__ int* compress(const float* src, int* compressedSrc, int offset, int nelem, int nthreads) {
-//  for (int idx = offset; idx < offset+nelem; idx += 1) {
-//    int var;
-//    if (src[idx] < 0) {
-//       var = static_cast<int> (src[idx] - 0.5);
-//    }
-//    else {
-//       var = static_cast<int> (src[idx] + 0.5); 
-//    }
-//    compressedSrc[idx] = var;
-//  }
-//  return compressedSrc;
-//}
-//
-//__device__  __forceinline__ int compress(float src, int nthreads) {
-//  if (src < 0) {
-//     return static_cast<int> (src - 0.5);
-//  }
-//  return static_cast<int> (src + 0.5); 
-//}
-
+inline __device__ void generate_normal_kernel(curandState* state, float* result) {
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    float random_number;
+    curandState localState = state[id];
+    random_number = curand_normal(&localState);
+    state[id] = localState;
+    result[id] = random_number;
+}
 
 
 inline __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int bucket_size, int bits) {
@@ -180,42 +132,6 @@ inline __device__ void find_meta_seq(const float* input, float* meta, int num_el
   }
   __syncthreads();
 }
-
-//__device__ void find_meta_parallel(float* input, float* meta, int num_elems, int bits) {
-//  int tid = threadIdx.x;
-//  int block_size = blockDim.x-32;
-//
-//  float* meta_buf = (float*)meta;
-//  const int MAX_NTHREADS = 544;
-//  const int shared_size = MAX_NTHREADS * 2;
-//  //__shared__ float sdata[shared_size];
-//  extern __shared__ float sdata[];
-//
-//  meta_buf[0] = input[0];
-//  meta_buf[1] = input[0];
-//
-//  if (tid < num_elems) {
-//      sdata[tid] = input[tid];
-//      sdata[block_size + tid] = input[tid];
-//  }
-//  __syncthreads();
-//
-//  for (int s = block_size / 2; s > 0; s >>= 1) {
-//    if (tid < s && tid + s < num_elems) {
-//      sdata[tid] = fmaxf(sdata[tid + s], sdata[tid]);
-//      sdata[block_size + tid] =
-//          fminf(sdata[block_size + tid + s], sdata[block_size + tid]);
-//    }
-//  }
-//  __syncthreads();
-//
-//  if (tid == 0) {
-//      const int divisor = (1 << bits) - 1;
-//      meta_buf[0] = (sdata[0] - sdata[block_size]) / divisor;
-//      meta_buf[1] = sdata[block_size];
-//  }
-//  __syncthreads();
-//}
 
 
 inline __device__ void find_meta_parallel(float* input, float* meta, int num_elems, int bits) {
