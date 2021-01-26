@@ -5,6 +5,7 @@
  ************************************************************************/
 
 #include "enqueue.h"
+#include <curand_kernel.h>
 
 NCCL_API(ncclResult_t, ncclAllReduce, const void* sendbuff, void* recvbuff, size_t count,
     ncclDataType_t datatype, ncclRedOp_t op, ncclComm* comm, cudaStream_t stream);
@@ -25,7 +26,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   //const void* compressedbuff1;
   //void* compressedbuff2;
   void** tempbuff_ptr1 = &tempbuff1;
-  void** tempbuff_ptr2 = &tempbuff2;
+  //void** tempbuff_ptr2 = &tempbuff2;
   void** tempbuff_ptr3 = &tempbuff3;
   //const void** compressedbuff_ptr1 = &compressedbuff1;
   //void** compressedbuff_ptr2 = &compressedbuff2;
@@ -51,6 +52,22 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
   //cudaMalloc(tempbuff_ptr2, nbytes/4 + meta_size);
   cudaMalloc(tempbuff_ptr3, nbytes);
+
+  const unsigned int threadsPerBlock = 512;
+  const unsigned int blockCount = 64;
+  const unsigned int totalThreads = threadsPerBlock * blockCount;
+  void * random_numbers;
+  void * states;
+
+  /* Allocate space for random_numbers on device */
+  cudaMalloc((void **)&random_numbers, totalThreads * sizeof(float));
+
+  /* Set results to 0 */
+  cudaMemset(random_numbers, 0, totalThreads * sizeof(float));
+
+  /* Allocate space for prng states on device */
+  cudaMalloc((void **)&states, totalThreads * sizeof(curandState));
+
  
   //cudaMemcpy(tempbuff1, (void*)a, count*sizeof(float), cudaMemcpyHostToDevice);
   //cudaMemcpy(tempbuff3, (void*)a, count*sizeof(float), cudaMemcpyHostToDevice);
@@ -74,7 +91,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
 
 
   struct ncclInfo info = { ncclCollAllReduce, "AllReduce",
-    sendbuff, recvbuff, tempbuff1, tempbuff2, tempbuff3, count, datatype, op, 0, comm, stream, /* Args */
+    sendbuff, recvbuff, tempbuff1, tempbuff2, tempbuff3, random_numbers, states, count, datatype, op, 0, comm, stream, /* Args */
     ALLREDUCE_CHUNKSTEPS, ALLREDUCE_SLICESTEPS};
   return ncclEnqueueCheck(&info);
 }

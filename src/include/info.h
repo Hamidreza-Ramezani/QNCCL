@@ -32,6 +32,8 @@ struct ncclInfo {
   void* tempbuff1;
   void* tempbuff2;
   void* tempbuff3;
+  void * random_numbers;
+  void * states;
   //const void* compressedbuff1;
   //void* compressedbuff2;
   size_t count;

@@ -83,9 +83,8 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
     cudaProfilerStart();
     //size_t heapSize = 128 * 1024 * 1024;
     //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
-    size_t a = 128*1024*1024;
+    //size_t a = 128*1024*1024;
     //paramsList->gridDim.x = 64;
-    printf("QNCCL is used\n");
     CUDACHECK(cudaLaunchCooperativeKernelMultiDevice(paramsList, numDevices,
             // These flags are to reduce the latency of using this API
             cudaCooperativeLaunchMultiDeviceNoPreSync|cudaCooperativeLaunchMultiDeviceNoPostSync));
@@ -381,9 +380,9 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.tempbuff1 = info->tempbuff1;
   coll->args.tempbuff2 = info->tempbuff2;
   coll->args.tempbuff3 = info->tempbuff3;
-  //coll->args.compressedbuff1 = info->compressedbuff1;
-  //coll->args.compressedbuff2 = info->compressedbuff2;
 
+  coll->args.random_numbers = info->random_numbers;
+  coll->args.states = info->states;
 
 
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
