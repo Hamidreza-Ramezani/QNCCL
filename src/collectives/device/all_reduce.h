@@ -30,7 +30,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 inline __device__ void setup_kernel(curandState *state, int nthreads) {
     int id = threadIdx.x + blockIdx.x * nthreads;
     curand_init(1234, id, 0, &state[id]);
-    //curand_init(1234, id, 0, &state[id]);
 }
 
 //inline __device__ void setup_kernel(curandStatePhilox4_32_10_t *state, int nthreads){
