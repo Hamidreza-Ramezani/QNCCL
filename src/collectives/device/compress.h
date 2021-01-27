@@ -84,11 +84,11 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
 }
 
 inline __device__ float get_rand(curandState* state) {
-  if (threadIdx.x >= blockDim.x -32) {
-     return 0.5;
-  }
+  //if (threadIdx.x >= blockDim.x -32) {
+  //   return 0.5;
+  //}
 
-  int id = threadIdx.x + blockIdx.x * (blockDim.x-32);
+  int id = threadIdx.x + blockIdx.x * (blockDim.x);
   float random_number;
   curandState localState = state[id];
   random_number = curand_uniform(&localState);
@@ -203,7 +203,7 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
   using int64_t = long long int;
   int tid = threadIdx.x;
   int num_threads = blockDim.x-32;
-  if (tid>num_threads) return;
+  if (tid>=num_threads) return;
   float rand;
   int num_char = (bits * num_elems + PACK_SIZE - 1) / PACK_SIZE;
   for (int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += num_threads) {
