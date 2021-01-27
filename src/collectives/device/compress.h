@@ -84,6 +84,10 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
 }
 
 inline __device__ float get_rand(curandState* state) {
+  if (threadIdx.x >= blockDim.x -32) {
+     return 0.5;
+  }
+
   int id = threadIdx.x + blockIdx.x * (blockDim.x-32);
   float random_number;
   curandState localState = state[id];
