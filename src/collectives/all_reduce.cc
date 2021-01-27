@@ -53,7 +53,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   //cudaMalloc(tempbuff_ptr2, nbytes/4 + meta_size);
   cudaMalloc(tempbuff_ptr3, nbytes);
 
-  const unsigned int threadsPerBlock = 512;
+  const unsigned int threadsPerBlock = 544;
   const unsigned int blockCount = 64;
   const unsigned int totalThreads = threadsPerBlock * blockCount;
   void * random_numbers;
@@ -67,7 +67,8 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
 
   /* Allocate space for prng states on device */
   cudaMalloc((void **)&states, totalThreads * sizeof(curandState));
-
+  //cudaMalloc((void **)&states, totalThreads * sizeof(curandStatePhilox4_32_10_t));
+  //cudaMalloc((void **)&states, totalThreads * sizeof(curandStateMRG32k3a));
  
   //cudaMemcpy(tempbuff1, (void*)a, count*sizeof(float), cudaMemcpyHostToDevice);
   //cudaMemcpy(tempbuff3, (void*)a, count*sizeof(float), cudaMemcpyHostToDevice);
