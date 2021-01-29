@@ -1,5 +1,6 @@
 #include "cuda_runtime.h"
 #include "cuda.h"
+#include "rand.h"
 #include <stdint.h>
 #include <curand_kernel.h>
 
@@ -83,19 +84,22 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
   }
 }
 
-inline __device__ float get_rand(curandState* state) {
-  //if (threadIdx.x >= blockDim.x -32) {
-  //   return 0.5;
-  //}
+//inline __device__ float get_rand(curandState* state) {
+//  int id = threadIdx.x + blockIdx.x * (blockDim.x);
+//  float random_number;
+//  curandState localState = state[id];
+//  random_number = curand_uniform(&localState);
+//  //random_number = curand_normal(&localState);
+//  state[id] = localState;
+//  return random_number;
+//}
 
-  int id = threadIdx.x + blockIdx.x * (blockDim.x);
-  float random_number;
-  curandState localState = state[id];
-  random_number = curand_uniform(&localState);
-  //random_number = curand_normal(&localState);
-  state[id] = localState;
-  return random_number;
-}
+//inline __device__ float get_rand(float* random_numbers) {
+//  int id = threadIdx.x + blockIdx.x * blockDim.x;
+//  float random_number;
+//  random_number = random_numbers[id];
+//  return random_number;
+//}
 
 //inline __device__ float get_rand(curandStatePhilox4_32_10_t *state) {
 //  if (threadIdx.x >= blockDim.x-32) {
@@ -199,7 +203,7 @@ MaxMinEncodeValue(float input, float* meta_info, float rand) {
 }
 
 
-inline __device__ void CompressBucket(float* input, unsigned char* output, float* meta_info, int num_elems, int bits, curandState* state) {
+inline __device__ void CompressBucket(float* input, unsigned char* output, float* meta_info, int num_elems, int bits, xorshift128p_state* state) {
   using int64_t = long long int;
   int tid = threadIdx.x;
   int num_threads = blockDim.x-32;
@@ -222,7 +226,7 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
 }
 
 
-inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* state) {
+inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, xorshift128p_state* state) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
   int num_blocks = 1;
@@ -254,7 +258,7 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
 }
 
 
-inline __device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* state) {
+inline __device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, xorshift128p_state* state) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
   int num_blocks = 1;
