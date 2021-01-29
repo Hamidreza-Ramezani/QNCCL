@@ -74,6 +74,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   /* Setup prng states */
   setup_kernel(devStates, nthreads);
 
+
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     //const int BITS=8;
     const int BITS=args->BITS;

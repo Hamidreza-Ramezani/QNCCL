@@ -80,7 +80,7 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
   //printf("count1: %d \n", count1);
   //count1 ++;    
   if (cgMode & 0x01) {
-    cudaProfilerStart();
+    //cudaProfilerStart();
     //size_t heapSize = 128 * 1024 * 1024;
     //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
     //size_t a = 128*1024*1024;
@@ -97,7 +97,7 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
     //cudaMemcpy(((CollectiveArgs*)(paramsList->args))->recvbuff, ((CollectiveArgs*)(paramsList->args))->tempbuff2, 8, cudaMemcpyDeviceToDevice);
 
 
-    cudaProfilerStop();
+    //cudaProfilerStop();
     return ncclSuccess;
   }
 #endif
