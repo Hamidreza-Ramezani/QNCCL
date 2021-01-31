@@ -60,10 +60,10 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   void * states;
 
   /* Allocate space for random_numbers on device */
-  cudaMalloc((void **)&random_numbers, totalThreads * sizeof(float));
+  //cudaMalloc((void **)&random_numbers, totalThreads * sizeof(float));
 
   /* Set results to 0 */
-  cudaMemset(random_numbers, 0, totalThreads * sizeof(float));
+  //cudaMemset(random_numbers, 0, totalThreads * sizeof(float));
 
   /* Allocate space for prng states on device */
   cudaMalloc((void **)&states, totalThreads * sizeof(curandState));
