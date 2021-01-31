@@ -72,7 +72,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   /* Setup prng states */
   //setup_kernel(devStates);
   xorshift128p_state* devStates = (xorshift128p_state*)args->states;
-  init_curand(1234, devStates); 
+  init_curand(1, devStates); 
 
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
