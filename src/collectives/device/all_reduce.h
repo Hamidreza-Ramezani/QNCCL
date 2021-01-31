@@ -27,13 +27,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   }
 }
 
-inline __device__ void setup_kernel(curandState *state, int nthreads) {
-    //if (threadIdx.x >= nthreads) { 
-    //  return; 
-    //}
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-    curand_init(1234, 0, 0, &state[id]);
-}
 
 //inline __device__ void setup_kernel(curandStatePhilox4_32_10_t *state, int nthreads){
 //    if (threadIdx.x >= nthreads) {
@@ -67,12 +60,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
   int bucket_size = args->bucket_size;
-  curandState* devStates = (curandState*)args->states;
-  //curandStatePhilox4_32_10_t* devStates = (curandStatePhilox4_32_10_t*)args->states;
-  //curandStateMRG32k3a* devStates = (curandStateMRG32k3a*)args->states;
-
-  /* Setup prng states */
-  setup_kernel(devStates, nthreads);
+  float* random_numbers = args->random_numbers; 
 
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
@@ -127,7 +115,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       //__syncthreads();
 
       //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+      quantize(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, random_numbers);
 
       //__syncthreads();
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1) {
@@ -218,7 +206,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //__syncthreads();
 
         //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-        quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+        quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, random_numbers);
 
         nelem_compressed = DIVUP(nelem, 8/BITS);
         prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
@@ -285,7 +273,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       }
 
       //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
-      quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+      quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, random_numbers);
       //////__syncthreads();
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
       //////dequantize<true>(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);

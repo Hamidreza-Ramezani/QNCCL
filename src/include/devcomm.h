@@ -143,7 +143,8 @@ struct CollectiveArgs {
   void * tempbuff1;
   void * tempbuff2;
   void * tempbuff3;
-  void * random_numbers;
+  float * random_numbers;
+  //void * random_numbers;
   void * states;
 
   bool with_compression;
