@@ -19,13 +19,9 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   void* tempbuff1;
   void* tempbuff2;
   void* tempbuff3;
-  //const void* compressedbuff1;
-  //void* compressedbuff2;
   void** tempbuff_ptr1 = &tempbuff1;
   //void** tempbuff_ptr2 = &tempbuff2;
   void** tempbuff_ptr3 = &tempbuff3;
-  //const void** compressedbuff_ptr1 = &compressedbuff1;
-  //void** compressedbuff_ptr2 = &compressedbuff2;
 
   int bucket_size;
   void * states;
@@ -50,13 +46,6 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
     cudaMalloc(tempbuff_ptr3, nbytes);
 
-    //const unsigned int threadsPerBlock = 512;
-    //const unsigned int blockCount = 64;
-    //const unsigned int totalThreads = threadsPerBlock * blockCount;
-    //void * states;
-
-    //curandGenerator_t gen;
-    //float * random_numbers;
     cudaMalloc((void **)&random_numbers, totalThreads * sizeof(float));
     curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
     curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
