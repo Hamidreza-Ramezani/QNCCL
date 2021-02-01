@@ -60,7 +60,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
   int bucket_size = args->bucket_size;
-  float* random_numbers = args->random_numbers; 
+  float* random_numbers = comm->random_numbers;
 
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {

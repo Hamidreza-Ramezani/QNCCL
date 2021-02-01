@@ -24,12 +24,12 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   void** tempbuff_ptr3 = &tempbuff3;
 
   int bucket_size;
-  void * states;
+  //void * states;
   curandGenerator_t gen;
-  float * random_numbers;
   const unsigned int threadsPerBlock = 512;
   const unsigned int blockCount = 64;
   const unsigned int totalThreads = threadsPerBlock * blockCount;
+  float * random_numbers = (float*)malloc(totalThreads * sizeof(float));
 
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
 
@@ -40,21 +40,20 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     } else {
       bucket_size = atoi(bucket_size_str);
     }
-
     int num_buckets = DIVUP(count, bucket_size);
     int meta_size = 2 * sizeof(float) * num_buckets;
     cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
     cudaMalloc(tempbuff_ptr3, nbytes);
-
-    cudaMalloc((void **)&random_numbers, totalThreads * sizeof(float));
+    //cudaMalloc((void **)&random_numbers, totalThreads * sizeof(float));
     curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
     curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
     curandGenerateUniform(gen, random_numbers, totalThreads);
+    cudaMemcpy(comm->devComm->random_numbers, random_numbers, totalThreads * sizeof(float), cudaMemcpyHostToDevice);
   }
   cudaDeviceSynchronize();
 
   struct ncclInfo info = { ncclCollAllReduce, "AllReduce",
-    sendbuff, recvbuff, tempbuff1, tempbuff2, tempbuff3, random_numbers, states, count, datatype, op, 0, comm, stream, /* Args */
+    sendbuff, recvbuff, tempbuff1, tempbuff2, tempbuff3, count, datatype, op, 0, comm, stream, /* Args */
     ALLREDUCE_CHUNKSTEPS, ALLREDUCE_SLICESTEPS};
   return ncclEnqueueCheck(&info);
 }

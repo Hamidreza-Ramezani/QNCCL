@@ -143,15 +143,14 @@ struct CollectiveArgs {
   void * tempbuff1;
   void * tempbuff2;
   void * tempbuff3;
-  float * random_numbers;
-  //void * random_numbers;
-  void * states;
+  //float * random_numbers;
+  //void * states;
 
   bool with_compression;
   int BITS;
   int bucket_size;
 
-  int dummy[4];
+  int dummy[8];
   //do_compression:boolean
 
   // Op-specific fields. Make sure the common part stays the
@@ -221,6 +220,7 @@ struct ncclDevComm {
   int rank;
   int nRanks;
   int buffSizes[NCCL_NUM_PROTOCOLS];
+  float * random_numbers;
 
   // Flag to ask NCCL kernels to abort
   volatile uint32_t *abortFlag;
