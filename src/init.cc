@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <curand.h>
 
 #define STR2(v) #v
 #define STR(v) STR2(v)
@@ -260,6 +261,22 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
   // Duplicate the channels on the device
   NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.channels, comm->p2pnChannels));
   NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, comm->p2pnChannels));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  //const unsigned int threadsPerBlock = 544;
+  //const unsigned int blockCount = 64;
+  //const unsigned int totalThreads = threadsPerBlock * blockCount;
+  //NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.random_numbers, totalThreads));
+  //curandGenerator_t gen;
+  //float * random_numbers = (float*)malloc(totalThreads * sizeof(float));
+  //curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+  //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
+  //curandGenerateUniform(gen, random_numbers, totalThreads);
+  //NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.random_numbers, random_numbers, totalThreads));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
   // Copy userRanks and peers
   for (int r=0; r<comm->p2pnChannels; r++) {

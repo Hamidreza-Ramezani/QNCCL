@@ -25,11 +25,12 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
 
   int bucket_size;
   //void * states;
-  curandGenerator_t gen;
-  const unsigned int threadsPerBlock = 512;
-  const unsigned int blockCount = 64;
-  const unsigned int totalThreads = threadsPerBlock * blockCount;
-  float * random_numbers = (float*)malloc(totalThreads * sizeof(float));
+  //curandGenerator_t gen;
+  //const unsigned int threadsPerBlock = 512;
+  //const unsigned int blockCount = 64;
+  //const unsigned int totalThreads = threadsPerBlock * blockCount;
+  //float ** random_numbers_address = &comm->hostDevComm.random_numbers;
+  //float * random_numbers = (float*)malloc(totalThreads * sizeof(float));
 
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
 
@@ -44,11 +45,13 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     int meta_size = 2 * sizeof(float) * num_buckets;
     cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
     cudaMalloc(tempbuff_ptr3, nbytes);
+    //cudaMalloc((void **)random_numbers_address, totalThreads * sizeof(float));
     //cudaMalloc((void **)&random_numbers, totalThreads * sizeof(float));
-    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-    curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
-    curandGenerateUniform(gen, random_numbers, totalThreads);
-    cudaMemcpy(comm->devComm->random_numbers, random_numbers, totalThreads * sizeof(float), cudaMemcpyHostToDevice);
+    //curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+    //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
+    //curandGenerateUniform(gen, (comm->hostDevComm).random_numbers, totalThreads);
+    //curandGenerateUniform(gen, random_numbers, totalThreads);
+    //cudaMemcpy(comm->hostDevComm.random_numbers, random_numbers, totalThreads * sizeof(float), cudaMemcpyHostToDevice);
   }
   cudaDeviceSynchronize();
 
