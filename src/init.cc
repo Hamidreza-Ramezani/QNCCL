@@ -264,7 +264,7 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  //const unsigned int threadsPerBlock = 544;
+  //const unsigned int threadsPerBlock = 512;
   //const unsigned int blockCount = 64;
   //const unsigned int totalThreads = threadsPerBlock * blockCount;
   //NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.random_numbers, totalThreads));
