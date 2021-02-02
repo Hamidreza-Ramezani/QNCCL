@@ -27,12 +27,12 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   }
 }
 
-inline __device__ void setup_kernel(curandState *state, int nthreads) {
-    //if (threadIdx.x >= nthreads) { 
-    //  return; 
+inline __device__ void setup_kernel(curandState *state) {
+    //if (threadIdx.x >= blockDim.x-32) {
+    //  return;
     //}
     int id = threadIdx.x + blockIdx.x * blockDim.x;
-    curand_init(1234, 0, 0, &state[id]);
+    curand_init(1, 0, 0, &state[id]);
 }
 
 //inline __device__ void setup_kernel(curandStatePhilox4_32_10_t *state, int nthreads){
@@ -72,7 +72,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   //curandStateMRG32k3a* devStates = (curandStateMRG32k3a*)args->states;
 
   /* Setup prng states */
-  setup_kernel(devStates, nthreads);
+  setup_kernel(devStates);
 
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {

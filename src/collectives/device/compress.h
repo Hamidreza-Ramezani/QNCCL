@@ -84,15 +84,10 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
 }
 
 inline __device__ float get_rand(curandState* state) {
-  //if (threadIdx.x >= blockDim.x -32) {
-  //   return 0.5;
-  //}
-
-  int id = threadIdx.x + blockIdx.x * (blockDim.x);
+  int id = threadIdx.x + blockIdx.x * (blockDim.x - 32);
   float random_number;
   curandState localState = state[id];
-  random_number = curand_uniform(&localState);
-  //random_number = curand_normal(&localState);
+  random_number = curand_uniform(state);
   state[id] = localState;
   return random_number;
 }
@@ -199,19 +194,21 @@ MaxMinEncodeValue(float input, float* meta_info, float rand) {
 }
 
 
-inline __device__ void CompressBucket(float* input, unsigned char* output, float* meta_info, int num_elems, int bits, curandState* state) {
+inline __device__ void CompressBucket(float* input, unsigned char* output, float* meta_info, int num_elems, int bits, curandState* states) {
   using int64_t = long long int;
   int tid = threadIdx.x;
   int num_threads = blockDim.x-32;
   if (tid>=num_threads) return;
   float rand;
   int num_char = (bits * num_elems + PACK_SIZE - 1) / PACK_SIZE;
+  curandState state = states[tid + blockIdx.x * blockDim.x];
   for (int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += num_threads) {
       int64_t value = 0;
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
         int idx = i * PACK_SIZE + j;
         //rand = 0.5;
-        rand = get_rand(state);
+        //rand = get_rand(states);
+        rand = curand_uniform(&state);
         int64_t encoded = MaxMinEncodeValue(input[idx], meta_info, rand);
         value += (encoded << (j * bits));
       }
@@ -219,10 +216,11 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
         output[i * bits + j] = value >> (PACK_SIZE * j) & 0xFF;
       }
   }
+  states[tid + blockIdx.x * blockDim.x] = state;
 }
 
 
-inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* state) {
+inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
   int num_blocks = 1;
@@ -248,13 +246,13 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
     CompressBucket(
         input + bucket_size * bucket_id, output + compressed_size * bucket_id,
         (meta + meta_multiplier * bucket_id),
-        cur_bucket_size, bits, state);
+        cur_bucket_size, bits, states);
   }
   __syncthreads();
 }
 
 
-inline __device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* state) {
+inline __device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
   int num_blocks = 1;
@@ -280,7 +278,7 @@ inline __device__ void quantize(const float* input_data, unsigned char* output_d
     CompressBucket(
         input + bucket_size * bucket_id, output + compressed_size * bucket_id,
         (meta + meta_multiplier * bucket_id),
-        cur_bucket_size, bits, state);
+        cur_bucket_size, bits, states);
   }
   __syncthreads();
 }
