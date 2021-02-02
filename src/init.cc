@@ -228,6 +228,25 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   NCCLCHECK(getBusId(comm->cudaDev, &comm->busId));
   TRACE(NCCL_INIT,"comm %p rank %d nranks %d cudaDev %d busId %x", comm, rank, ndev, comm->cudaDev, comm->busId);
 
+//////////////////////////////////////////////////////
+
+  char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
+  if (ring_allReduce_version != NULL) {
+     if (strcasecmp(ring_allReduce_version, "new") == 0) {
+        const unsigned int threadsPerBlock = 512;
+        const unsigned int blockCount = 64;
+        const unsigned int totalThreads = threadsPerBlock * blockCount;
+        ncclCudaCalloc(&(comm->random_numbers), totalThreads);
+        curandGenerator_t gen;
+        curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+        curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
+        curandGenerateUniform(gen, comm->random_numbers, totalThreads);
+
+     }
+  }
+//////////////////////////////////////////////////////
+
+
   comm->doneEvent = doneEvent;
   comm->checkPointers = ncclParamCheckPointers() == 1 ? true : false;
 #if CUDART_VERSION >= 9020
@@ -264,17 +283,16 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  //const unsigned int threadsPerBlock = 512;
-  //const unsigned int blockCount = 64;
-  //const unsigned int totalThreads = threadsPerBlock * blockCount;
-  //NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.random_numbers, totalThreads));
-  //curandGenerator_t gen;
-  //float * random_numbers = (float*)malloc(totalThreads * sizeof(float));
-  //curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-  //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
-  //curandGenerateUniform(gen, random_numbers, totalThreads);
-  //NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.random_numbers, random_numbers, totalThreads));
-
+  char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
+  if (ring_allReduce_version != NULL) {
+     if (strcasecmp(ring_allReduce_version, "new") == 0) {
+        const unsigned int threadsPerBlock = 512;
+        const unsigned int blockCount = 64;
+        const unsigned int totalThreads = threadsPerBlock * blockCount;
+        ncclCudaCalloc(&comm->hostDevComm.random_numbers, totalThreads);
+        ncclCudaMemcpy(comm->hostDevComm.random_numbers, comm->random_numbers, totalThreads);
+     }
+  }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 

@@ -9,7 +9,6 @@
 #include "coll_net.h"
 #include <cuda_profiler_api.h>
 #include <curand.h>
-#include <curand_kernel.h>
 
 #define CURAND_CALL(x) do { if((x)!=CURAND_STATUS_SUCCESS) { \
     printf("Error at %s:%d\n",__FILE__,__LINE__);\
@@ -386,9 +385,6 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.tempbuff2 = info->tempbuff2;
   coll->args.tempbuff3 = info->tempbuff3;
 
-  //coll->args.random_numbers = info->random_numbers;
-  //coll->args.states = info->states;
-
 
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
   coll->args.with_compression = false;
@@ -427,28 +423,6 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
 
 
   coll->args.comm = info->comm->devComm;
-
-  if (strcasecmp(ring_allReduce_version, "new") == 0) {
-    cudaSetDevice(info->comm->cudaDev);
-    const unsigned int threadsPerBlock = 512;
-    const unsigned int blockCount = 64;
-    const unsigned int totalThreads = threadsPerBlock * blockCount;
-    curandGenerator_t gen;
-    //float * random_numbers = (float*)malloc(totalThreads * sizeof(float));
-    float ** address = &(coll->args.comm->random_numbers);
-    CUDACHECK(cudaMalloc((void**)address, totalThreads * sizeof(float)));
-    //curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-    //curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
-    //curandGenerateUniform(gen, info->comm->hostDevComm.random_numbers, totalThreads);
-    CURAND_CALL(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
-    CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
-    CURAND_CALL(curandGenerateUniform(gen, coll->args.comm->random_numbers, totalThreads));
-    //curandGenerateUniform(gen, random_numbers, totalThreads);
-    //NCCLCHECK(ncclCudaMemcpy(coll->args.comm->random_numbers, random_numbers, totalThreads));
-  }
-  cudaDeviceSynchronize();
-
-
 
   if (info->coll == ncclCollSendRecv) {
     coll->args.p2p.sendCount = info->sendbytes;

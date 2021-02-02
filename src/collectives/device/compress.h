@@ -205,9 +205,9 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
       int64_t value = 0;
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
         int idx = i * PACK_SIZE + j;
-        rand = 0.5;
+        //rand = 0.5;
         //rand = get_rand(state);
-        //rand = random_numbers[tid+blockIdx.x*num_threads];
+        rand = random_numbers[tid+blockIdx.x*num_threads];
         int64_t encoded = MaxMinEncodeValue(input[idx], meta_info, rand);
         value += (encoded << (j * bits));
       }
