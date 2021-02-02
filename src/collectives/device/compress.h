@@ -83,42 +83,6 @@ __device__ __forceinline__ void decompress(unsigned char* src, float* decompress
   }
 }
 
-inline __device__ float get_rand(curandState* state) {
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-  float random_number;
-  curandState localState = state[id];
-  random_number = curand_uniform(&localState);
-  state[id] = localState;
-  return random_number;
-}
-
-//inline __device__ float get_rand(curandStatePhilox4_32_10_t *state) {
-//  if (threadIdx.x >= blockDim.x-32) {
-//    return 0.5;
-//  }
-//  int id = threadIdx.x + blockIdx.x * (blockDim.x-32);
-//  float random_number;
-//  curandStatePhilox4_32_10_t localState = state[id];
-//  random_number = curand_uniform(&localState);
-//  //random_number = curand_normal(&localState);
-//  state[id] = localState;
-//  return random_number;
-//}
-
-//inline __device__ float get_rand(curandStateMRG32k3a *state) {
-//  //if (threadIdx.x >= blockDim.x-32) {
-//  //  return 0.5;
-//  //}
-//  int id = threadIdx.x + blockIdx.x * (blockDim.x);
-//  float random_number;
-//  curandStateMRG32k3a localState = state[id];
-//  random_number = (float)curand_uniform_double(&localState);
-//  //random_number = curand_normal(&localState);
-//  state[id] = localState;
-//  return random_number;
-//}
-
-
 inline __device__ void find_meta_seq(const float* input, float* meta, int num_elem, int bucket_size, int bits) {
   //int index = threadIdx.x + blockIdx.x * (blockDim.x-32);
   //int stride = gridDim.x * (blockDim.x-32);
@@ -206,7 +170,6 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
         int idx = i * PACK_SIZE + j;
         //rand = 0.5;
-        //rand = get_rand(state);
         rand = random_numbers[tid+blockIdx.x*num_threads];
         int64_t encoded = MaxMinEncodeValue(input[idx], meta_info, rand);
         value += (encoded << (j * bits));

@@ -28,23 +28,6 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 }
 
 
-//inline __device__ void setup_kernel(curandStatePhilox4_32_10_t *state, int nthreads){
-//    if (threadIdx.x >= nthreads) {
-//      return;
-//    }
-//    int id = threadIdx.x + blockIdx.x * nthreads;
-//    curand_init(1234, 0, 0, &state[id]);
-//}
-
-//inline __device__ void setup_kernel(curandStateMRG32k3a *state, int nthreads) {
-//    if (threadIdx.x >= nthreads) {
-//      return;
-//    }
-//    int id = threadIdx.x + blockIdx.x * nthreads;
-//    curand_init(0, 0, 0, &state[id]);
-//}
-
-
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int tid = threadIdx.x;
