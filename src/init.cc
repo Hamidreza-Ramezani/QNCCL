@@ -937,6 +937,13 @@ static ncclResult_t commDestroy(ncclComm_t comm) {
   return ncclSuccess;
 }
 
+NCCL_API(ncclResult_t, ncclTempDestroy, ncclComm_t comm);
+ncclResult_t ncclTempDestroy(ncclComm_t comm) {
+  cudaFree(comm->args.args.tempbuff1);
+  cudaFree(comm->args.args.tempbuff3);
+  return ncclSuccess;
+}
+
 NCCL_API(ncclResult_t, ncclCommDestroy, ncclComm_t comm);
 ncclResult_t ncclCommDestroy(ncclComm_t comm) {
   if (comm == NULL)

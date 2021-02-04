@@ -292,6 +292,17 @@ ncclResult_t ncclGroupEnd() {
     }
   }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+  //for (int i=0; i<ncclGroupIndex; i++) {
+  //  struct ncclAsyncArgs* args = ncclGroupArgs+i;
+  //  ////cudaSetDevice(args->coll.comm->cudaDev);
+  //  cudaFree(args->coll.comm->args.args.tempbuff1);
+  //  cudaFree(args->coll.comm->args.args.tempbuff3);
+  //}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
   goto end;
 group_cleanup:
   if (ret != ncclSuccess) {

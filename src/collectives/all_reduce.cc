@@ -13,19 +13,14 @@ NCCL_API(ncclResult_t, ncclAllReduce, const void* sendbuff, void* recvbuff, size
 ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     ncclDataType_t datatype, ncclRedOp_t op, ncclComm* comm, cudaStream_t stream) {
 
-
   cudaSetDevice(comm->cudaDev);
   size_t nbytes = count * ncclTypeSize(datatype);
   void* tempbuff1;
   void* tempbuff2;
   void* tempbuff3;
-  //const void* compressedbuff1;
-  //void* compressedbuff2;
   void** tempbuff_ptr1 = &tempbuff1;
   //void** tempbuff_ptr2 = &tempbuff2;
   void** tempbuff_ptr3 = &tempbuff3;
-  //const void** compressedbuff_ptr1 = &compressedbuff1;
-  //void** compressedbuff_ptr2 = &compressedbuff2;
 
   int bucket_size;
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
@@ -36,7 +31,6 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     } else {
       bucket_size = atoi(bucket_size_str);
     }
-
     int num_buckets = DIVUP(count, bucket_size);
     int meta_size = 2 * sizeof(float) * num_buckets;
     cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
