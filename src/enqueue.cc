@@ -374,11 +374,9 @@ static ncclResult_t getLoopInfo(struct ncclInfo* info) {
 static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclColl* coll, struct ncclProxyArgs* proxyArgs /* output */) {
   coll->args.sendbuff = info->sendbuff;
   coll->args.recvbuff = info->recvbuff;
-  coll->args.tempbuff1 = info->tempbuff1;
-  coll->args.tempbuff2 = info->tempbuff2;
-  coll->args.tempbuff3 = info->tempbuff3;
-  //coll->args.compressedbuff1 = info->compressedbuff1;
-  //coll->args.compressedbuff2 = info->compressedbuff2;
+  ///////coll->args.tempbuff1 = info->tempbuff1;
+  ///////coll->args.tempbuff2 = info->tempbuff2;
+  ///////coll->args.tempbuff3 = info->tempbuff3;
 
 
 
@@ -405,20 +403,6 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   } else {
     coll->args.bucket_size = atoi(bucket_size);
   }
- 
-  //cudaSetDevice(info->comm->cudaDev);
-  //void** tempbuff_ptr1 = &(coll->args.tempbuff1);
-  //void** tempbuff_ptr2 = &(coll->args.tempbuff2);
-  //cudaMalloc(tempbuff_ptr1, info->nBytes);
-  //cudaMalloc(tempbuff_ptr2, info->nBytes);
-  ////cudaStreamSynchronize(info->comm->groupStream);
-  ////cudaStreamCreate(&(info->comm->groupStream));
-  //cudaMemset(coll->args.tempbuff1, 0, info->nBytes);
-  //cudaMemset(coll->args.tempbuff2, 0, info->nBytes);
-  //cudaDeviceSynchronize();
-
-
-
 
   coll->args.comm = info->comm->devComm;
 
@@ -658,8 +642,8 @@ end:
     NCCLCHECK(ncclBarrierEnqueueWait(info->comm));
     NCCLCHECK(ncclEnqueueEvents(info->comm));
 
-    CUDACHECK(cudaFree(info->tempbuff1));
-    CUDACHECK(cudaFree(info->tempbuff3));
+    ////CUDACHECK(cudaFree(info->tempbuff1));
+    ////CUDACHECK(cudaFree(info->tempbuff3));
 
     return ncclSuccess;
   }

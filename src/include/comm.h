@@ -59,6 +59,9 @@ struct ncclRecvMem {
 struct ncclComm {
   struct ncclChannel channels[MAXCHANNELS];
 
+  ///unsigned char * tempbuff1;
+  ///float * tempbuff3;
+
   struct ncclPeerInfo* peerInfo;
   struct ncclTopoSystem* topo;
 
