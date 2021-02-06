@@ -267,7 +267,7 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
   if (ring_allReduce_version != NULL) {
      if (strcasecmp(ring_allReduce_version, "new") == 0) {
         cudaSetDevice(comm->cudaDev);
-        int temp_size = 256*1024*1024;
+        //int INITIAL_SIZE = 256*1024*1024;
         int bucket_size;
         char* bucket_size_str = getenv("bucket_size");
         if (bucket_size_str == NULL) {
@@ -275,10 +275,10 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
         } else {
           bucket_size = atoi(bucket_size_str);
         }
-        int num_buckets = DIVUP(temp_size, bucket_size);
+        int num_buckets = DIVUP(INITIAL_SIZE, bucket_size);
         int meta_size = 2 * sizeof(float) * num_buckets;
-        ncclCudaCalloc((unsigned char**)&comm->hostDevComm.tempbuff1, temp_size + meta_size);
-        ncclCudaCalloc((float**)&comm->hostDevComm.tempbuff3, temp_size);
+        cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, INITIAL_SIZE + meta_size);
+        cudaMalloc((float**)&comm->hostDevComm.tempbuff3, sizeof(float) * INITIAL_SIZE);
         cudaDeviceSynchronize();
      }
   }

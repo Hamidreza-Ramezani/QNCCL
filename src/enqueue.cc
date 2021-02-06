@@ -404,6 +404,25 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
     coll->args.bucket_size = atoi(bucket_size);
   }
 
+
+  //if (ring_allReduce_version == NULL) {
+  //   if (strcasecmp(ring_allReduce_version, "new") == 0) {
+  //      if (info->count > INITIAL_SIZE) {
+  //         cudaSetDevice(info->comm->cudaDev);
+  //         size_t nbytes = info->count * sizeof(float);
+  //         int num_buckets = DIVUP(info->count, 1024);
+  //         int meta_size = 2 * sizeof(float) * num_buckets;
+  //         cudaFree(info->comm->hostDevComm.tempbuff1);
+  //         cudaFree(info->comm->hostDevComm.tempbuff3);
+  //         cudaMalloc(&(info->comm->hostDevComm.tempbuff1), nbytes/4 + meta_size);
+  //         cudaMalloc(&(info->comm->hostDevComm.tempbuff3), nbytes);
+  //         cudaDeviceSynchronize();
+  //      }
+  //   }
+  //}
+
+
+
   coll->args.comm = info->comm->devComm;
 
   if (info->coll == ncclCollSendRecv) {
