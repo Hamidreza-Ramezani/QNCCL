@@ -83,7 +83,6 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
     //cudaProfilerStart();
     //size_t heapSize = 128 * 1024 * 1024;
     //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
-    //size_t a = 128*1024*1024;
     //paramsList->gridDim.x = 64;
     CUDACHECK(cudaLaunchCooperativeKernelMultiDevice(paramsList, numDevices,
             // These flags are to reduce the latency of using this API
@@ -106,8 +105,8 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
   for (int i = 0; i < numDevices; i++) {
     struct cudaLaunchParams* params = paramsList+i;
     CUDACHECK(cudaSetDevice(cudaDevs[i]));
-    size_t  heapSize = 128 * 1024 * 1024;
-    cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
+    //size_t  heapSize = 128 * 1024 * 1024;
+    //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
     CUDACHECK(cudaLaunchKernel(params->func, params->gridDim, params->blockDim, params->args, params->sharedMem, params->stream));
   }
   CUDACHECK(cudaSetDevice(savedDev));
@@ -148,8 +147,8 @@ ncclResult_t setupLaunch(struct ncclComm* comm, struct cudaLaunchParams* params)
   // As we pass that coll directly, we can free it immediately.
   coll->active = 0;
   
-  size_t heapSize = 128 * 1024 * 1024;
-  cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
+  //size_t heapSize = 128 * 1024 * 1024;
+  //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
 
   params->func = ncclKerns[coll->funcIndex];
   return ncclSuccess;
@@ -221,8 +220,8 @@ ncclResult_t ncclBarrierEnqueue(struct ncclComm* comm) {
     if (isLast) {
       // I'm the last. Launch all operations.
       
-      size_t heapSize = 128 * 1024 * 1024;
-      cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
+      //size_t heapSize = 128 * 1024 * 1024;
+      //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
       NCCLCHECK(ncclLaunchCooperativeKernelMultiDevice(comm->intraParams, comm->intraCudaDevs, comm->intraRanks, *comm->intraCGMode));
       NCCLCHECK(ncclCpuBarrierLast(comm));
     }
@@ -245,8 +244,8 @@ ncclResult_t ncclBarrierEnqueueWait(ncclComm_t comm) {
 
 
   if (comm->launchMode == ncclComm::PARALLEL) {
-    size_t heapSize = 128 * 1024 * 1024;
-    cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
+    //size_t heapSize = 128 * 1024 * 1024;
+    //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
     CUDACHECK(cudaLaunchKernel(params->func, params->gridDim, params->blockDim, params->args, params->sharedMem, params->stream));
   } else {
     NCCLCHECK(ncclCpuBarrierOut(comm));
@@ -270,8 +269,6 @@ ncclResult_t ncclBarrierEnqueueWait(ncclComm_t comm) {
 
 ncclResult_t ncclEnqueueEvents(ncclComm_t comm) {
   struct cudaLaunchParams *params = comm->myParams;
-  //size_t heapSize = 128 * 1024 * 1024;
-  //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
   // Enqueue event after NCCL kernel
   CUDACHECK(cudaEventRecord(comm->doneEvent, params->stream));
   // Use internal NCCL stream for CGMD/GROUP launch if required or if the user stream is NULL
@@ -377,11 +374,10 @@ static ncclResult_t getLoopInfo(struct ncclInfo* info) {
 static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclColl* coll, struct ncclProxyArgs* proxyArgs /* output */) {
   coll->args.sendbuff = info->sendbuff;
   coll->args.recvbuff = info->recvbuff;
-  coll->args.tempbuff1 = info->tempbuff1;
-  coll->args.tempbuff2 = info->tempbuff2;
-  coll->args.tempbuff3 = info->tempbuff3;
+  ///////coll->args.tempbuff1 = info->tempbuff1;
+  ///////coll->args.tempbuff2 = info->tempbuff2;
+  ///////coll->args.tempbuff3 = info->tempbuff3;
 
-  coll->args.random_numbers = info->random_numbers;
   coll->args.states = info->states;
 
 
@@ -408,18 +404,23 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   } else {
     coll->args.bucket_size = atoi(bucket_size);
   }
- 
-  //cudaSetDevice(info->comm->cudaDev);
-  //void** tempbuff_ptr1 = &(coll->args.tempbuff1);
-  //void** tempbuff_ptr2 = &(coll->args.tempbuff2);
-  //cudaMalloc(tempbuff_ptr1, info->nBytes);
-  //cudaMalloc(tempbuff_ptr2, info->nBytes);
-  ////cudaStreamSynchronize(info->comm->groupStream);
-  ////cudaStreamCreate(&(info->comm->groupStream));
-  //cudaMemset(coll->args.tempbuff1, 0, info->nBytes);
-  //cudaMemset(coll->args.tempbuff2, 0, info->nBytes);
-  //cudaDeviceSynchronize();
 
+
+  //if (ring_allReduce_version == NULL) {
+  //   if (strcasecmp(ring_allReduce_version, "new") == 0) {
+  //      if (info->count > INITIAL_SIZE) {
+  //         cudaSetDevice(info->comm->cudaDev);
+  //         size_t nbytes = info->count * sizeof(float);
+  //         int num_buckets = DIVUP(info->count, 1024);
+  //         int meta_size = 2 * sizeof(float) * num_buckets;
+  //         cudaFree(info->comm->hostDevComm.tempbuff1);
+  //         cudaFree(info->comm->hostDevComm.tempbuff3);
+  //         cudaMalloc(&(info->comm->hostDevComm.tempbuff1), nbytes/4 + meta_size);
+  //         cudaMalloc(&(info->comm->hostDevComm.tempbuff3), nbytes);
+  //         cudaDeviceSynchronize();
+  //      }
+  //   }
+  //}
 
 
 
@@ -618,8 +619,6 @@ ncclResult_t ncclSaveP2p(struct ncclInfo* info) {
 
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info) {
   // Launch asynchronously if needed
-  size_t heapSize = 128 * 1024 * 1024;
-  cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
   if (ncclAsyncMode()) {
     ncclResult_t ret = ncclSuccess;
     int savedDev = -1;
@@ -662,28 +661,10 @@ end:
     NCCLCHECK(ncclBarrierEnqueue(info->comm));
     NCCLCHECK(ncclBarrierEnqueueWait(info->comm));
     NCCLCHECK(ncclEnqueueEvents(info->comm));
-    
-    //float a[8] = {1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0};
-    //cudaMemcpy(info->recvbuff, a, 8, cudaMemcpyDefault);
-    
-    //printf("tempbuff2 is as follows: \n");
-    //for (int i=0; i<info->count; ++i) {
-    //  printf("tempbuff2 [%d] = %d\n", i, *(((int8_t*)(info->tempbuff2))+i));
-    //}
 
-    //cudaMemcpy((void*)(info->recvbuff), (void*)(info->tempbuff2), info->count, cudaMemcpyHostToHost); 
-    //std::copy((int8_t*)(info->tempbuff2), (int8_t*)(info->tempbuff2) + info->count, (float*)(info->recvbuff)); 
+    ////CUDACHECK(cudaFree(info->tempbuff1));
+    ////CUDACHECK(cudaFree(info->tempbuff3));
 
-    //adding an environment variable    
-    //cudaMemcpy(info->recvbuff, info->tempbuff2, info->count, cudaMemcpyDeviceToDevice);
-    //cudaPrintfDisplay(stdout, true);
-    //cudaPrintfEnd();
-
-    CUDACHECK(cudaFree(info->tempbuff1));
-    CUDACHECK(cudaFree(info->tempbuff3));
-
-    //CUDACHECK(cudaFree((void*)info->compressedbuff1));
-    //CUDACHECK(cudaFree(info->compressedbuff2));
     return ncclSuccess;
   }
 }

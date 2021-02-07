@@ -29,13 +29,10 @@ struct ncclInfo {
   // NCCL Coll Args
   const void* sendbuff;
   void* recvbuff;
-  void* tempbuff1;
-  void* tempbuff2;
-  void* tempbuff3;
-  void * random_numbers;
+  //////void* tempbuff1;
+  //////void* tempbuff2;
+  //////void* tempbuff3;
   void * states;
-  //const void* compressedbuff1;
-  //void* compressedbuff2;
   size_t count;
   ncclDataType_t datatype;
   ncclRedOp_t op;
