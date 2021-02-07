@@ -364,7 +364,7 @@ inline __device__ float MaxMinDecodeValue(unsigned char input, float* meta_info,
   return min + input * unit;
 }
 
-template <bool ADD>
+//template <bool ADD>
 inline __device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int bits) {
   //int tid = threadIdx.x + blockIdx.x * (blockDim.x-32);
   //int stride = gridDim.x * (blockDim.x-32);
@@ -388,11 +388,11 @@ inline __device__ void dequantize(unsigned char* input_data, float* output, int 
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
         unsigned char encoded_value = (value >> (j * bits)) & (divisor - 1);
         float d = MaxMinDecodeValue(encoded_value, meta_info, i * PACK_SIZE + j, bucket_size);
-        if (ADD) {
-          output[i * PACK_SIZE + j] = output[i * PACK_SIZE + j] + d;
-        } else {
+        //if (ADD) {
+        //  output[i * PACK_SIZE + j] = output[i * PACK_SIZE + j] + d;
+        //} else {
           output[i * PACK_SIZE + j] = d;
-        }
+        //}
       }
     }
   }
