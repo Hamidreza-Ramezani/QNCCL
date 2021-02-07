@@ -74,8 +74,8 @@ ncclResult_t  ncclCommDestroy(ncclComm_t comm);
 ncclResult_t pncclCommDestroy(ncclComm_t comm);
 
 
-/* Frees temp buffers */
-ncclResult_t ncclTempDestroy(ncclComm_t comm);
+//////* Frees temp buffers */
+/////ncclResult_t ncclTempDestroy(ncclComm_t comm);
 
 
 /* Frees resources associated with communicator object and aborts any operations
