@@ -32,7 +32,7 @@ struct ncclInfo {
   //////void* tempbuff1;
   //////void* tempbuff2;
   //////void* tempbuff3;
-  void * states;
+  //////void * states;
   size_t count;
   ncclDataType_t datatype;
   ncclRedOp_t op;
