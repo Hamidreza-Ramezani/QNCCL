@@ -67,7 +67,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
   int bucket_size = args->bucket_size;
-  curandState* devStates = (curandState*)args->states;
+  curandState* devStates = (curandState*)comm->states;
   //curandStatePhilox4_32_10_t* devStates = (curandStatePhilox4_32_10_t*)args->states;
   //curandStateMRG32k3a* devStates = (curandStateMRG32k3a*)args->states;
 
