@@ -75,7 +75,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   /* Setup prng states */
   setup_kernel(devStates);
   //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
-  //  printf("ncclAllReduceRingKernelNew is called\n");
+  //  printf("blockDim is %d\n", nthreads);
+  //  printf("gridDim is %d\n", nChannels);
   //} 
 
 
