@@ -73,9 +73,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
   /* Setup prng states */
   setup_kernel(devStates);
-  if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
-    printf("ncclAllReduceRingKernelNew is called\n");
-  } 
+  //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
+  //  printf("ncclAllReduceRingKernelNew is called\n");
+  //} 
 
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
@@ -498,9 +498,9 @@ __device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
 
-  if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
-    printf("ncclAllReduceRingKernelNew is called\n");
-  } 
+  //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
+  //  printf("ncclAllReduceRingKernelNew is called\n");
+  //} 
 
   // Compute pointers
   const T * __restrict__ thisInput = (const T*)args->sendbuff;
