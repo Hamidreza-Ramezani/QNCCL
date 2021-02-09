@@ -123,6 +123,7 @@ static ncclResult_t ncclInit() {
   if (initialized) return ncclSuccess;
   pthread_mutex_lock(&initLock);
   if (!initialized) {
+    //printf("Hello from QNCCL!\n");
     initEnv();
     NCCLCHECK(initNet());
     INFO(NCCL_INIT, "Using network %s", ncclNetName());
