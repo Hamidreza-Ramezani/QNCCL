@@ -14,18 +14,18 @@
 #include <type_traits>
 #include <curand_kernel.h>
 
-template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
-template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
+//template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
+//template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
 
 
-template<int UNROLL, class FUNC, typename T>
-__device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
-  if (args->with_compression) {
-      ncclAllReduceRingKernel_new<UNROLL,FUNC,T>(args);
-  } else {
-    ncclAllReduceRingKernel_old<UNROLL,FUNC,T>(args);
-  }
-}
+//template<int UNROLL, class FUNC, typename T>
+//__device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
+//  if (args->with_compression) {
+//      ncclAllReduceRingKernel_new<UNROLL,FUNC,T>(args);
+//  } else {
+//    ncclAllReduceRingKernel_old<UNROLL,FUNC,T>(args);
+//  }
+//}
 
 inline __device__ void setup_kernel(curandState *state) {
     //if (threadIdx.x >= blockDim.x-32) {
@@ -53,7 +53,7 @@ inline __device__ void setup_kernel(curandState *state) {
 
 
 template<int UNROLL, class FUNC, typename T>
-__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
+__device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   const int tid = threadIdx.x;
   const int nthreads = args->coll.nThreads-WARP_SIZE;
   const int bid = args->coll.bid;
@@ -66,21 +66,22 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int nranks = comm->nRanks;
   const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
   const ssize_t size = args->coll.count;
-  int bucket_size = args->bucket_size;
+  int bucket_size = 1024;
+  //int bucket_size = args->bucket_size;
   curandState* devStates = (curandState*)comm->states;
   //curandStatePhilox4_32_10_t* devStates = (curandStatePhilox4_32_10_t*)args->states;
   //curandStateMRG32k3a* devStates = (curandStateMRG32k3a*)args->states;
 
   /* Setup prng states */
   setup_kernel(devStates);
-  if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
-    printf("ncclAllReduceRingKernelNew is called\n");
-  } 
+  //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
+  //  printf("ncclAllReduceRingKernelNew is called\n");
+  //} 
 
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
-    //const int BITS=8;
-    const int BITS=args->BITS;
+    const int BITS=8;
+    //const int BITS=args->BITS;
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
     float * __restrict__ thisOutput = (float*)args->recvbuff;
     //////unsigned char * __restrict__ compressedOutput = (unsigned char*)args->tempbuff2;
@@ -371,9 +372,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
 
      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
-       //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-       //  printf("Hello world from old kernel\n");
-       //}
        ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
        ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
        ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
@@ -483,142 +481,142 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 }
 
 
-template<int UNROLL, class FUNC, typename T>
-__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
-  const int tid = threadIdx.x;
-  const int nthreads = args->coll.nThreads-WARP_SIZE;
-  const int bid = args->coll.bid;
-  const int nChannels = args->coll.nChannels;
-  struct ncclDevComm* comm = args->comm;
-  struct ncclChannel* channel = comm->channels+blockIdx.x;
-  struct ncclRing* ring = &channel->ring;
-  const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / (sizeof(T)*NCCL_STEPS);
-  const int chunkSize = stepSize * ALLREDUCE_CHUNKSTEPS;
-  const int nranks = comm->nRanks;
-  const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
-  const ssize_t size = args->coll.count;
-
-  if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
-    printf("ncclAllReduceRingKernelNew is called\n");
-  } 
-
-  // Compute pointers
-  const T * __restrict__ thisInput = (const T*)args->sendbuff;
-  T * __restrict__ thisOutput = (T*)args->recvbuff;
-
-  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
-    prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
-
-  for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
-    //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-    //  printf("Hello world from old kernel\n");
-    //}
-    ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
-    ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
-    ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
-
-    //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-    //  printf("\nrealChunkSize %d\n", realChunkSize);
-    //}
-
-
-    /////////////// begin AllReduce steps ///////////////
-    ssize_t offset;
-    int nelem;
-    int chunk;
-
-    // step 0: push data to next GPU
-    chunk = ring->devUserRanks[nranks-1];
-    offset = chunkOffset + chunk * realChunkSize;
-    nelem = min(realChunkSize, size-offset);
-
-    //if(tid == 0 && blockIdx.x == 0) {
-    //   printf("in the place 1\n");
-    //   printf("in device:%d\n", ring->devUserRanks[0]);
-    //   printf("offset is %d\n", offset);
-    //   printf("nelem is %d\n", nelem);
-    //   printf("\n\n\n");
-    //}
-    //__syncthreads();
-
-    prims.send(thisInput+offset, nelem);
-    for (int j=2; j<nranks; ++j) {
-      chunk = ring->devUserRanks[nranks-j];
-      offset = chunkOffset + chunk * realChunkSize;
-      nelem = min(realChunkSize, size-offset);
-      
-      //if(tid == 0 && blockIdx.x == 0) {
-      //   printf("in the place 2 and j %d\n", j);
-      //   printf("in device:%d\n", ring->devUserRanks[0]);
-      //   printf("offset is %d\n", offset);
-      //   printf("nelem is %d\n", nelem);
-      //   printf("\n\n\n");
-      //}
-      //__syncthreads();
-
-      //prims.recv(thisOutput+offset, nelem);
-      //prims.send(thisInput+offset, nelem);
-      prims.recvReduceSend(thisInput+offset, nelem);
-    }
-
-    // step k-1: reduce this buffer and data, which will produce the final
-    // result that we store in this data and push to the next GPU
-    chunk = ring->devUserRanks[0];
-    offset = chunkOffset + chunk * realChunkSize;
-    nelem = min(realChunkSize, size-offset);
-    
-    //if(tid == 0 && blockIdx.x == 0) {
-    //   printf("in the place 3\n");
-    //   printf("in device:%d\n", ring->devUserRanks[0]);
-    //   printf("offset is %d\n", offset);
-    //   printf("nelem is %d\n", nelem);
-    //   printf("\n\n\n");
-    //}
-    //__syncthreads();
-
-    //prims.directRecv(thisOutput+offset, offset, nelem);
-    //prims.copySend(thisInput+offset, thisOutput+offset, nelem);
-
-    prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
-
-    // k-2 steps: copy to next GPU
-    for (int j=1; j<nranks-1; ++j) {
-      chunk = ring->devUserRanks[nranks-j];
-      offset = chunkOffset + chunk * realChunkSize;
-      nelem = min(realChunkSize, size-offset);
-
-
-      //if(tid == 0 && blockIdx.x == 0) {
-      //   printf("in the place 4 and j %d\n", j);
-      //   printf("in device:%d\n", ring->devUserRanks[0]);
-      //   printf("offset is %d\n", offset);
-      //   printf("nelem is %d\n", nelem);
-      //   printf("\n\n\n");
-      //}
-      //__syncthreads();
-
-      prims.directRecvCopySend(thisOutput+offset, offset, nelem);
-    }
-
-    // Make final copy from buffer to dest.
-    chunk = ring->devUserRanks[1];
-    offset = chunkOffset + chunk * realChunkSize;
-    nelem = min(realChunkSize, size-offset);
-
-
-    //if(tid == 0 && blockIdx.x == 0) {
-    //   printf("in the place 3\n");
-    //   printf("in device:%d\n", ring->devUserRanks[0]);
-    //   printf("offset is %d\n", offset);
-    //   printf("nelem is %d\n", nelem);
-    //   printf("\n\n\n");
-    //}
-    //__syncthreads();
-
-    // Final wait/copy.
-    prims.directRecv(thisOutput+offset, offset, nelem);
-  }
-}
+//template<int UNROLL, class FUNC, typename T>
+//__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args) {
+//  const int tid = threadIdx.x;
+//  const int nthreads = args->coll.nThreads-WARP_SIZE;
+//  const int bid = args->coll.bid;
+//  const int nChannels = args->coll.nChannels;
+//  struct ncclDevComm* comm = args->comm;
+//  struct ncclChannel* channel = comm->channels+blockIdx.x;
+//  struct ncclRing* ring = &channel->ring;
+//  const int stepSize = comm->buffSizes[NCCL_PROTO_SIMPLE] / (sizeof(T)*NCCL_STEPS);
+//  const int chunkSize = stepSize * ALLREDUCE_CHUNKSTEPS;
+//  const int nranks = comm->nRanks;
+//  const ssize_t loopSize = nChannels*(ssize_t)chunkSize;
+//  const ssize_t size = args->coll.count;
+//
+//  if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
+//    printf("ncclAllReduceRingKernelNew is called\n");
+//  } 
+//
+//  // Compute pointers
+//  const T * __restrict__ thisInput = (const T*)args->sendbuff;
+//  T * __restrict__ thisOutput = (T*)args->recvbuff;
+//
+//  ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, T, 1, 1, 1, FUNC>
+//    prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+//
+//  for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
+//    //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+//    //  printf("Hello world from old kernel\n");
+//    //}
+//    ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
+//    ALIGN_SIZE(realChunkSize, nthreads*sizeof(uint64_t)/sizeof(T));
+//    ssize_t chunkOffset = gridOffset + bid*nranks*realChunkSize;
+//
+//    //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+//    //  printf("\nrealChunkSize %d\n", realChunkSize);
+//    //}
+//
+//
+//    /////////////// begin AllReduce steps ///////////////
+//    ssize_t offset;
+//    int nelem;
+//    int chunk;
+//
+//    // step 0: push data to next GPU
+//    chunk = ring->devUserRanks[nranks-1];
+//    offset = chunkOffset + chunk * realChunkSize;
+//    nelem = min(realChunkSize, size-offset);
+//
+//    //if(tid == 0 && blockIdx.x == 0) {
+//    //   printf("in the place 1\n");
+//    //   printf("in device:%d\n", ring->devUserRanks[0]);
+//    //   printf("offset is %d\n", offset);
+//    //   printf("nelem is %d\n", nelem);
+//    //   printf("\n\n\n");
+//    //}
+//    //__syncthreads();
+//
+//    prims.send(thisInput+offset, nelem);
+//    for (int j=2; j<nranks; ++j) {
+//      chunk = ring->devUserRanks[nranks-j];
+//      offset = chunkOffset + chunk * realChunkSize;
+//      nelem = min(realChunkSize, size-offset);
+//      
+//      //if(tid == 0 && blockIdx.x == 0) {
+//      //   printf("in the place 2 and j %d\n", j);
+//      //   printf("in device:%d\n", ring->devUserRanks[0]);
+//      //   printf("offset is %d\n", offset);
+//      //   printf("nelem is %d\n", nelem);
+//      //   printf("\n\n\n");
+//      //}
+//      //__syncthreads();
+//
+//      //prims.recv(thisOutput+offset, nelem);
+//      //prims.send(thisInput+offset, nelem);
+//      prims.recvReduceSend(thisInput+offset, nelem);
+//    }
+//
+//    // step k-1: reduce this buffer and data, which will produce the final
+//    // result that we store in this data and push to the next GPU
+//    chunk = ring->devUserRanks[0];
+//    offset = chunkOffset + chunk * realChunkSize;
+//    nelem = min(realChunkSize, size-offset);
+//    
+//    //if(tid == 0 && blockIdx.x == 0) {
+//    //   printf("in the place 3\n");
+//    //   printf("in device:%d\n", ring->devUserRanks[0]);
+//    //   printf("offset is %d\n", offset);
+//    //   printf("nelem is %d\n", nelem);
+//    //   printf("\n\n\n");
+//    //}
+//    //__syncthreads();
+//
+//    //prims.directRecv(thisOutput+offset, offset, nelem);
+//    //prims.copySend(thisInput+offset, thisOutput+offset, nelem);
+//
+//    prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
+//
+//    // k-2 steps: copy to next GPU
+//    for (int j=1; j<nranks-1; ++j) {
+//      chunk = ring->devUserRanks[nranks-j];
+//      offset = chunkOffset + chunk * realChunkSize;
+//      nelem = min(realChunkSize, size-offset);
+//
+//
+//      //if(tid == 0 && blockIdx.x == 0) {
+//      //   printf("in the place 4 and j %d\n", j);
+//      //   printf("in device:%d\n", ring->devUserRanks[0]);
+//      //   printf("offset is %d\n", offset);
+//      //   printf("nelem is %d\n", nelem);
+//      //   printf("\n\n\n");
+//      //}
+//      //__syncthreads();
+//
+//      prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+//    }
+//
+//    // Make final copy from buffer to dest.
+//    chunk = ring->devUserRanks[1];
+//    offset = chunkOffset + chunk * realChunkSize;
+//    nelem = min(realChunkSize, size-offset);
+//
+//
+//    //if(tid == 0 && blockIdx.x == 0) {
+//    //   printf("in the place 3\n");
+//    //   printf("in device:%d\n", ring->devUserRanks[0]);
+//    //   printf("offset is %d\n", offset);
+//    //   printf("nelem is %d\n", nelem);
+//    //   printf("\n\n\n");
+//    //}
+//    //__syncthreads();
+//
+//    // Final wait/copy.
+//    prims.directRecv(thisOutput+offset, offset, nelem);
+//  }
+//}
 
 
 template<int UNROLL, class FUNC, typename T>
