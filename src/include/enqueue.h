@@ -11,7 +11,7 @@
 #include "group.h"
 #include "collectives.h"
 
-#define INITIAL_SIZE 256*1024*1024
+#define INITIAL_SIZE 1024*1024
 
 
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info);
