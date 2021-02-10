@@ -47,7 +47,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes/4 + meta_size);
     cudaMemset(comm->hostDevComm.tempbuff3, 0, nbytes);
   }
-  cudaDeviceSynchronize();
+  //cudaDeviceSynchronize();
 
   struct ncclInfo info = { ncclCollAllReduce, "AllReduce",
     sendbuff, recvbuff, count, datatype, op, 0, comm, stream, /* Args */
