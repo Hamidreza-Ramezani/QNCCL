@@ -241,11 +241,11 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
   int compressed_size = (bucket_size * bits + PACK_SIZE - 1) / PACK_SIZE;
 
   float* input = (float*)input_data;
-  find_meta_seq(input, meta, num_elems, bucket_size, bits);
-  //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
-  //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-  //  find_meta_parallel(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, bits);
-  //}
+  //find_meta_seq(input, meta, num_elems, bucket_size, bits);
+  for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
+    cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
+    find_meta_parallel(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, bits);
+  }
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
     CompressBucket(
@@ -273,11 +273,11 @@ inline __device__ void quantize(const float* input_data, unsigned char* output_d
   int compressed_size = (bucket_size * bits + PACK_SIZE - 1) / PACK_SIZE;
 
   float* input = (float*)input_data;
-  find_meta_seq(input, meta, num_elems, bucket_size, bits);
-  //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
-  //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-  //  find_meta_parallel(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, bits);
-  //}
+  //find_meta_seq(input, meta, num_elems, bucket_size, bits);
+  for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
+    cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
+    find_meta_parallel(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, bits);
+  }
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
     CompressBucket(
