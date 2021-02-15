@@ -180,6 +180,11 @@ inline __device__ void find_meta_parallel(float* input, float* meta, int num_ele
   __syncthreads();
 }
 
+
+
+/**
+ The return value of this function is l in the stochastic quantization part of the QSGD paper.
+*/
 inline __device__ unsigned char
 MaxMinEncodeValue(float input, float* meta_info, float rand) {
   float* maxmin = ((float*)meta_info);
@@ -208,7 +213,7 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
         int idx = i * PACK_SIZE + j;
         //rand = 0.5;
         //rand = get_rand(states);
-        rand = 1.0 - curand_uniform(&state);
+        rand = curand_uniform(&state);
         int64_t encoded = MaxMinEncodeValue(input[idx], meta_info, rand);
         value += (encoded << (j * bits));
       }

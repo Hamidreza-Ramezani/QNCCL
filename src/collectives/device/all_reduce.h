@@ -76,7 +76,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   setup_kernel(devStates);
   //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
   //  //printf("blockDim is %d\n", nthreads);
-  //  printf("buffer size is %d\n", size);
+  //  printf("gridDim is %d\n", nChannels);
+  //  //printf("buffer size is %d\n", size);
   //} 
 
 
