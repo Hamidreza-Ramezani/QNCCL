@@ -11,6 +11,9 @@
 #include "group.h"
 #include "collectives.h"
 
+
+#define INITIAL_SIZE 256*1024*1024
+
 ncclResult_t ncclEnqueueCheck(struct ncclInfo* info);
 ncclResult_t ncclCpuBarrierIn(struct ncclComm* comm, int* isLast);
 ncclResult_t ncclCpuBarrierLast(struct ncclComm* comm);

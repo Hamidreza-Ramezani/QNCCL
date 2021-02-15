@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <curand_kernel.h>
 
 #define STR2(v) #v
 #define STR(v) STR2(v)
@@ -247,8 +248,8 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   comm->asyncOpCount = 0;
   comm->asyncTotalSize = 0;
 
-  static_assert(MAXCHANNELS <= sizeof(*comm->connectSend)*8, "comm->connectSend must have enough bits for all channels");
-  static_assert(MAXCHANNELS <= sizeof(*comm->connectRecv)*8, "comm->connectRecv must have enough bits for all channels");
+  //static_assert(MAXCHANNELS <= sizeof(*comm->connectSend)*8, "comm->connectSend must have enough bits for all channels");
+  //static_assert(MAXCHANNELS <= sizeof(*comm->connectRecv)*8, "comm->connectRecv must have enough bits for all channels");
   NCCLCHECK(ncclCalloc(&comm->connectSend, comm->nRanks));
   NCCLCHECK(ncclCalloc(&comm->connectRecv, comm->nRanks));
 
@@ -267,6 +268,27 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
   // Duplicate the channels on the device
   NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.channels, comm->p2pnChannels));
   NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, comm->p2pnChannels));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  cudaSetDevice(comm->cudaDev);
+  //int INITIAL_SIZE = 256*1024*1024;
+  int bucket_size = 1024;
+  //char* bucket_size_str = getenv("bucket_size");
+  //if (bucket_size_str == NULL) {
+  //  bucket_size = 1024;
+  //} else {
+  //  bucket_size = atoi(bucket_size_str);
+  //}
+  int num_buckets = DIVUP(INITIAL_SIZE, bucket_size);
+  int meta_size = 2 * sizeof(float) * num_buckets;
+  cudaMalloc((void **)&comm->hostDevComm.states, 544 * 64 * sizeof(curandState));
+  cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, INITIAL_SIZE + meta_size);
+  cudaMalloc((float**)&comm->hostDevComm.tempbuff3, sizeof(float) * INITIAL_SIZE);
+  cudaDeviceSynchronize();
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
   // Copy userRanks and peers
   for (int r=0; r<comm->p2pnChannels; r++) {

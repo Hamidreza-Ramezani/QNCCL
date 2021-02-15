@@ -46,7 +46,8 @@ union ncclLLFifoLine {
 };
 
 #define WARP_SIZE 32
-#define MAXCHANNELS 32
+#define MAXCHANNELS 64
+//#define MAXCHANNELS 32
 #define NCCL_MAX_NTHREADS 640
 #define NCCL_SIMPLE_MAX_NTHREADS 512
 #define NCCL_LL_MAX_NTHREADS 512
@@ -199,6 +200,9 @@ struct ncclDevComm {
   int rank;
   int nRanks;
   int buffSizes[NCCL_NUM_PROTOCOLS];
+  void * tempbuff1;
+  void * tempbuff3;
+  void * states;
 
   // Flag to ask NCCL kernels to abort
   volatile uint32_t *abortFlag;
