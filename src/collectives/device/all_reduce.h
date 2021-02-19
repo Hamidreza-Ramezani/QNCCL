@@ -28,10 +28,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 }
 
 inline __device__ void setup_kernel(curandState *state) {
-    //if (threadIdx.x >= blockDim.x-32) {
-    //  return;
-    //}
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    if (threadIdx.x >= blockDim.x-32) {
+      return;
+    }
+    int id = threadIdx.x + blockIdx.x * (blockDim.x-32);
     curand_init(1234, 0, 0, &state[id]);
 }
 
