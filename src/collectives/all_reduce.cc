@@ -15,7 +15,8 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
 
   cudaSetDevice(comm->cudaDev);
   size_t nbytes = count * ncclTypeSize(datatype);
-
+  
+  int bits=8;
   int bucket_size = 1024;
   //void * states;
   //char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
@@ -38,7 +39,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     //   cudaMalloc((float**)&comm->hostDevComm.tempbuff3, nbytes);
     //}
     //cudaMalloc((void **)&states, 544 * 64 * sizeof(curandState));
-    cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes/4 + meta_size);
+    cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes*bits/32 + meta_size);
     cudaMemset(comm->hostDevComm.tempbuff3, 0, nbytes);
   //}
   //cudaDeviceSynchronize();
