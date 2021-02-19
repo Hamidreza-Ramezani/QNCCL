@@ -23,6 +23,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
   //////void** tempbuff_ptr3 = &tempbuff3;
 
   int bucket_size;
+  int bits=8;
   //void * states;
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
   if (strcasecmp(ring_allReduce_version, "new") == 0) {
@@ -35,6 +36,13 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     }
     int num_buckets = DIVUP(count, bucket_size);
     int meta_size = 2 * sizeof(float) * num_buckets;
+
+    char* quantization_size_per_entry = getenv("BITS");
+    if (quantization_size_per_entry == NULL) {
+      bits = 8;
+    } else {
+      bits = atoi(quantization_size_per_entry);
+    }
     //////cudaMalloc(tempbuff_ptr1, nbytes/4 + meta_size);
     //////cudaMalloc(tempbuff_ptr3, nbytes);
     //if (count > INITIAL_SIZE) {
@@ -44,7 +52,7 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     //   cudaMalloc((float**)&comm->hostDevComm.tempbuff3, nbytes);
     //}
     //cudaMalloc((void **)&states, 544 * 64 * sizeof(curandState));
-    cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes/4 + meta_size);
+    cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes*bits/32 + meta_size);
     cudaMemset(comm->hostDevComm.tempbuff3, 0, nbytes);
   }
   //cudaDeviceSynchronize();
