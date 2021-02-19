@@ -49,7 +49,8 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     //   cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, nbytes/4 + meta_size);
     //   cudaMalloc((float**)&comm->hostDevComm.tempbuff3, nbytes);
     //}
-    cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes*bits/32  + meta_size);
+    cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes/4  + meta_size);
+    //cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes*bits/32  + meta_size);
     cudaMemset(comm->hostDevComm.tempbuff3, 0, nbytes);
   }
   cudaDeviceSynchronize();
