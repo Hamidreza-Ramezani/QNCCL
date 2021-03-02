@@ -201,7 +201,7 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
   if (tid>=num_threads) return;
   float rand;
   int num_char = (bits * num_elems + PACK_SIZE - 1) / PACK_SIZE;
-  curandState state = states[tid + blockIdx.x * num_threads];
+  curandState state = states[tid + blockIdx.x * blockDim.x];
   for (int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += num_threads) {
       int64_t value = 0;
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
@@ -216,7 +216,7 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
         output[i * bits + j] = value >> (PACK_SIZE * j) & 0xFF;
       }
   }
-  states[tid + blockIdx.x * num_threads] = state;
+  states[tid + blockIdx.x * blockDim.x] = state;
 }
 
 

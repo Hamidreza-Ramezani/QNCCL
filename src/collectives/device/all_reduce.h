@@ -28,10 +28,10 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
 }
 
 inline __device__ void setup_kernel(curandState *state) {
-    if (threadIdx.x >= blockDim.x-32) {
-      return;
-    }
-    int id = threadIdx.x + blockIdx.x * (blockDim.x-32);
+    //if (threadIdx.x >= blockDim.x-32) {
+    //  return;
+    //}
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
     curand_init(1234, 0, 0, &state[id]);
 }
 
@@ -288,14 +288,14 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
         //float var = static_cast<float>(compressed_temp[idx]) + thisInput[idx];
         //compress(var, (unsigned char*)(compressed_temp+idx));
         decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
-        //thisOutput[idx] = decompressed_temp[idx];
+        thisOutput[idx] = decompressed_temp[idx];
       }
 
       //compress(decompressed_temp+offset, compressed_temp+offset, nelem, args->coll.nThreads);
       quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
       //////__syncthreads();
       //decompress(compressed_temp+offset, thisOutput+offset, nelem, args->coll.nThreads);
-      dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
+      //dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
 
       //prims.copySend(compressed_temp+offset, compressedOutput+offset, nelem+meta_size);
       //////prims.copySend(compressed_temp+compressed_offset, compressed_temp+compressed_offset, nelem+meta_size);

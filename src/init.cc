@@ -279,7 +279,7 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
         }
         int num_buckets = DIVUP(INITIAL_SIZE, bucket_size);
         int meta_size = 2 * sizeof(float) * num_buckets;
-        cudaMalloc((void **)&comm->hostDevComm.states, 512 * 64 * sizeof(curandState));
+        cudaMalloc((void **)&comm->hostDevComm.states, 544 * 64 * sizeof(curandState));
         cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, INITIAL_SIZE + meta_size);
         cudaMalloc((float**)&comm->hostDevComm.tempbuff3, sizeof(float) * INITIAL_SIZE);
         cudaDeviceSynchronize();
