@@ -43,17 +43,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const ssize_t size = args->coll.count;
   int bucket_size = args->bucket_size;
   
-  //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
-  //   printf("buffer size is %d\n", (int)size);
-  //   printf("QNCCL is used\n");
-  //}
   
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
-
     //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
     //   printf("buffer size is %d\n", (int)size);
-    //   printf("QNCCL is used\n");
     //}
     //const int BITS=8;
     const int BITS=args->BITS;
@@ -340,6 +334,11 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   }
 
   else {
+
+     //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
+     //   printf("QNCCL2 is used\n");
+     //   printf("buffer size is %d\n", (int)size);
+     //}
      const T * __restrict__ thisInput = (const T*)args->sendbuff;
      T * __restrict__ thisOutput = (T*)args->recvbuff;
 
