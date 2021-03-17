@@ -27,7 +27,7 @@
 #define STR2(v) #v
 #define STR(v) STR2(v)
 
-#define MAX_NTHREADS 288
+#define MAX_NTHREADS 544
 
 
 #ifdef ENABLE_TRACE
@@ -260,6 +260,30 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
   // Duplicate the channels on the device
   NCCLCHECK(ncclCudaCalloc(&comm->hostDevComm.channels, comm->p2pnChannels));
   NCCLCHECK(ncclCudaMemcpy(comm->hostDevComm.channels, comm->channels, comm->p2pnChannels));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
+  if (ring_allReduce_version != NULL) {
+     if (strcasecmp(ring_allReduce_version, "new") == 0) {
+        cudaSetDevice(comm->cudaDev);
+        //int INITIAL_SIZE = 256*1024*1024;
+        int bucket_size;
+        char* bucket_size_str = getenv("bucket_size");
+        if (bucket_size_str == NULL) {
+          bucket_size = 1024;
+        } else {
+          bucket_size = atoi(bucket_size_str);
+        }
+        int num_buckets = DIVUP(INITIAL_SIZE, bucket_size);
+        int meta_size = 2 * sizeof(float) * num_buckets;
+        cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, INITIAL_SIZE + meta_size);
+        cudaMalloc((float**)&comm->hostDevComm.tempbuff3, sizeof(float) * INITIAL_SIZE);
+        cudaDeviceSynchronize();
+     }
+  }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   // Copy userRanks and peers
   for (int r=0; r<comm->p2pnChannels; r++) {
@@ -936,6 +960,13 @@ static ncclResult_t commDestroy(ncclComm_t comm) {
 
   return ncclSuccess;
 }
+
+//////NCCL_API(ncclResult_t, ncclTempDestroy, ncclComm_t comm);
+//////ncclResult_t ncclTempDestroy(ncclComm_t comm) {
+//////  cudaFree(comm->args.args.tempbuff1);
+//////  cudaFree(comm->args.args.tempbuff3);
+//////  return ncclSuccess;
+//////}
 
 NCCL_API(ncclResult_t, ncclCommDestroy, ncclComm_t comm);
 ncclResult_t ncclCommDestroy(ncclComm_t comm) {

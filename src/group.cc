@@ -118,7 +118,7 @@ ncclResult_t ncclGroupStart() {
 
 static ncclResult_t scheduleSendRecv(struct ncclComm* comm, int delta, int channelId, ssize_t recvbytes, void* recvbuff, ssize_t sendbytes, const void* sendbuff) {
   struct ncclInfo info = { ncclCollSendRecv, "SendRecv",
-     sendbuff, recvbuff, NULL, NULL, NULL, (size_t)std::max<ssize_t>(sendbytes,recvbytes), ncclInt8, ncclSum, -1, comm, comm->userStream, /* Args */
+     sendbuff, recvbuff, (size_t)std::max<ssize_t>(sendbytes,recvbytes), ncclInt8, ncclSum, -1, comm, comm->userStream, /* Args */
     1, 1 };
   info.delta = delta;
   info.channelId = channelId;
@@ -153,6 +153,7 @@ ncclResult_t ncclGroupEnd() {
   if (ncclGroupMode > 0) return ncclSuccess;
   int savedDev;
   CUDACHECK(cudaGetDevice(&savedDev));
+
   int activeThreads = 0;
   int doneArray[MAX_ASYNC_OPS];
   for (int i=0; i<ncclGroupIndex; i++) doneArray[i] = 1;
@@ -290,6 +291,16 @@ ncclResult_t ncclGroupEnd() {
       NCCLCHECKGOTO(ncclEnqueueEvents(args->coll.comm), ret, end);
     }
   }
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+  //for (int i=0; i<ncclGroupIndex; i++) {
+  //  struct ncclAsyncArgs* args = ncclGroupArgs+i;
+  //  ////cudaSetDevice(args->coll.comm->cudaDev);
+  //  ncclTempDestroy(args->coll.comm);
+  //}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 
   goto end;
 group_cleanup:

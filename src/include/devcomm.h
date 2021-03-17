@@ -47,7 +47,8 @@ union ncclLLFifoLine {
 };
 
 #define WARP_SIZE 32
-#define MAXCHANNELS 32
+#define MAXCHANNELS 128
+//#define MAXCHANNELS 32
 #define NCCL_MAX_NTHREADS 512
 #define NCCL_LL_MAX_NTHREADS NCCL_MAX_NTHREADS
 #define NCCL_LL_LINES_PER_THREAD 8
@@ -139,14 +140,15 @@ struct CollectiveArgs {
   // local and remote input, output, and buffer
   const void * sendbuff;
   void * recvbuff;
-  void * tempbuff1;
-  void * tempbuff2;
-  void * tempbuff3;
-  //const void * compressedbuff1;
-  //void * compressedbuff2;
+  //////void * tempbuff1;
+  //////void * tempbuff2;
+  //////void * tempbuff3;
+
   bool with_compression;
-  
-  int dummy[10];
+  int BITS;
+  int bucket_size;
+
+  int dummy[14];
   //do_compression:boolean
 
   // Op-specific fields. Make sure the common part stays the
@@ -216,6 +218,11 @@ struct ncclDevComm {
   int rank;
   int nRanks;
   int buffSizes[NCCL_NUM_PROTOCOLS];
+
+  ///unsigned char * tempbuff1;
+  ///float * tempbuff3;
+  void * tempbuff1;
+  void * tempbuff3;
 
   // Flag to ask NCCL kernels to abort
   volatile uint32_t *abortFlag;
