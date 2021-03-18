@@ -14,22 +14,22 @@
 #include <type_traits>
 
 
-template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
-template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
+//template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args);
+//template<int UNROLL, class FUNC, typename T>__device__ void ncclAllReduceRingKernel_old(struct CollectiveArgs* args);
+//
+//
+//template<int UNROLL, class FUNC, typename T>
+//__device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
+//  if (args->with_compression) {
+//      ncclAllReduceRingKernel_new<UNROLL,FUNC,T>(args);
+//  } else {
+//    ncclAllReduceRingKernel_old<UNROLL,FUNC,T>(args);
+//  }
+//}
 
 
 template<int UNROLL, class FUNC, typename T>
 __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
-  if (args->with_compression) {
-      ncclAllReduceRingKernel_new<UNROLL,FUNC,T>(args);
-  } else {
-    ncclAllReduceRingKernel_old<UNROLL,FUNC,T>(args);
-  }
-}
-
-
-template<int UNROLL, class FUNC, typename T>
-__device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   const int tid = threadIdx.x;
   const int nthreads = args->coll.nThreads-WARP_SIZE;
   const int bid = args->coll.bid;
