@@ -39,13 +39,6 @@ __device__ T compress(T src) {
 __device__ __forceinline__ void compress(float* src, unsigned char* compressedSrc, int nelem) {
   const int tid = threadIdx.x;
   for (int idx = tid; idx < nelem; idx += blockDim.x) {
-    //int8_t var;
-    //if (src[idx] < 0) {
-    //  var = static_cast<int8_t> (src[idx] - 0.5);
-    //} else {
-    //  var = static_cast<int8_t> (src[idx] + 0.5);
-    //}
-    //compressedSrc[idx] = var;
     compressedSrc[idx] = static_cast<unsigned char>(src[idx]);
   }
 }
@@ -54,13 +47,6 @@ __device__ __forceinline__ void compress(float* src, unsigned char* compressedSr
 __device__ __forceinline__ void compress(const float* src, unsigned char* compressedSrc, int nelem) {
   const int tid = threadIdx.x;
   for (int idx = tid; idx < nelem; idx += blockDim.x) {
-    //int8_t var;
-    //if (src[idx] < 0) {
-    //  var = static_cast<int8_t> (src[idx] - 0.5);
-    //} else {
-    //  var = static_cast<int8_t> (src[idx] + 0.5); 
-    //}
-    //compressedSrc[idx] = var;
     compressedSrc[idx] = static_cast<unsigned char>(src[idx]);
   }
 }
