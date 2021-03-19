@@ -29,7 +29,8 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     char* bucket_size_str = getenv("bucket_size");
     //int INITIAL_SIZE = 256*1024*1024;
     if (bucket_size_str == NULL) {
-      bucket_size = 1024;
+      bucket_size = 128;
+      //bucket_size = 1024;
     } else {
       bucket_size = atoi(bucket_size_str);
     }

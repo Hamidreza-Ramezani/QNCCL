@@ -57,9 +57,6 @@
   NCCL_FUNCS3B(coll, copy)
 
 
-//int count1 = 0;
-
-
 
 // Must be consistent with the ncclFuncSet enum
 static void* const ncclKerns[1+NCCL_NUM_FUNCTIONS*ncclNumOps*ncclNumTypes*NCCL_NUM_ALGORITHMS*NCCL_NUM_PROTOCOLS] = {
@@ -80,10 +77,6 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
   //printf("count1: %d \n", count1);
   //count1 ++;    
   if (cgMode & 0x01) {
-    cudaProfilerStart();
-    //size_t heapSize = 128 * 1024 * 1024;
-    //cudaDeviceSetLimit(cudaLimitMallocHeapSize, heapSize);
-    //paramsList->gridDim.x = 64;
     CUDACHECK(cudaLaunchCooperativeKernelMultiDevice(paramsList, numDevices,
             // These flags are to reduce the latency of using this API
             cudaCooperativeLaunchMultiDeviceNoPreSync|cudaCooperativeLaunchMultiDeviceNoPostSync));
@@ -92,11 +85,6 @@ ncclResult_t ncclLaunchCooperativeKernelMultiDevice(struct cudaLaunchParams *par
     //cudaMemset(((CollectiveArgs*)(paramsList->args))->recvbuff, 1, 8 * sizeof(float));
 
 
-    //cudaMemcpy(((CollectiveArgs*)(paramsList->args))->recvbuff, a, 8, cudaMemcpyDefault);
-    //cudaMemcpy(((CollectiveArgs*)(paramsList->args))->recvbuff, ((CollectiveArgs*)(paramsList->args))->tempbuff2, 8, cudaMemcpyDeviceToDevice);
-
-
-    cudaProfilerStop();
     return ncclSuccess;
   }
 #endif
@@ -397,12 +385,13 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   } else {
     coll->args.BITS = atoi(quantization_size_per_entry);
   }
-  char* bucket_size = getenv("bucket_size");
-  if (bucket_size == NULL) {
-    coll->args.bucket_size = 1024;
-  } else {
-    coll->args.bucket_size = atoi(bucket_size);
-  }
+  //char* bucket_size = getenv("bucket_size");
+  //if (bucket_size == NULL) {
+  //  coll->args.bucket_size = 2 * (info->nThreads - 32);
+  //  //coll->args.bucket_size = 1024;
+  //} else {
+  //  coll->args.bucket_size = atoi(bucket_size);
+  //}
 
 
   //if (ring_allReduce_version == NULL) {
@@ -442,6 +431,17 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   coll->args.coll.count = info->count;
   coll->args.coll.nChannels = info->nChannels;
   coll->args.coll.nThreads = info->nThreads;
+
+
+  char* bucket_size = getenv("bucket_size");
+  if (bucket_size == NULL) {
+    coll->args.bucket_size = 2 * (info->nThreads - 32);
+    //coll->args.bucket_size = 1024;
+  } else {
+    coll->args.bucket_size = atoi(bucket_size);
+  }
+
+
 
   //int bucket_size = info->nThreads - 32;
   //int num_buckets = DIVUP(info->count, bucket_size);

@@ -44,6 +44,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   int bucket_size = args->bucket_size;
   
   
+   //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
+   //   printf("bucket size is %d\n", bucket_size);
+   //}
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
