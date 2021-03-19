@@ -356,8 +356,8 @@ ncclResult_t initParams(struct ncclComm* comm) {
   struct cudaLaunchParams* params = comm->myParams = comm->intraParams+comm->intraRank;
   params->args = &comm->argsptr;
   params->stream = NULL;
-  //params->sharedMem = 0;
-  params->sharedMem = MAX_NTHREADS * 2 * sizeof(float);
+  params->sharedMem = 0;
+  //params->sharedMem = MAX_NTHREADS * 2 * sizeof(float);
   params->blockDim.x = 0; params->blockDim.y = params->blockDim.z = 1;
   params->gridDim.x = 0; params->gridDim.y = params->gridDim.z = 1;
   return ncclSuccess;
