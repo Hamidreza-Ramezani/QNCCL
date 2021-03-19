@@ -2,7 +2,7 @@
 
 
 make clean
-export DEBUG=1
+#export DEBUG=1
 #export NCCL_DEBUG=INFO
 #export NCCL_DEBUG_FILE
 #export NCCL_DEBUG_SUBSYS
