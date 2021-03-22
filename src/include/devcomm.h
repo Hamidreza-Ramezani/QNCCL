@@ -144,11 +144,11 @@ struct CollectiveArgs {
   //////void * tempbuff2;
   //////void * tempbuff3;
 
-  bool with_compression;
+  //bool with_compression;
   int BITS;
   int bucket_size;
 
-  int dummy[14];
+  int dummy[15];
   //do_compression:boolean
 
   // Op-specific fields. Make sure the common part stays the
