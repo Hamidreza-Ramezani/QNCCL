@@ -45,7 +45,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
 
-    prims.send(thisInput+offset, nelem);
+    prims.send(thisInput+offset, nelem/4);
+    //prims.send(thisInput+offset, nelem);
 
     // k-2 steps: reduce and copy to next GPU
     for (int j=2; j<nranks; ++j) {
@@ -53,7 +54,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
-      prims.recvReduceSend(thisInput+offset, nelem);
+      prims.recvReduceSend(thisInput+offset, nelem/4);
+      //prims.recvReduceSend(thisInput+offset, nelem);
     }
 
     // step k-1: reduce this buffer and data, which will produce the final
@@ -62,7 +64,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     offset = chunkOffset + chunk * realChunkSize;
     nelem = min(realChunkSize, size-offset);
 
-    prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
+    prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem/4);
+    //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
     // k-2 steps: copy to next GPU
     for (int j=1; j<nranks-1; ++j) {
@@ -70,7 +73,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
       offset = chunkOffset + chunk * realChunkSize;
       nelem = min(realChunkSize, size-offset);
 
-      prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+      prims.directRecvCopySend(thisOutput+offset, offset, nelem/4);
+      //prims.directRecvCopySend(thisOutput+offset, offset, nelem);
     }
 
     // Make final copy from buffer to dest.
@@ -79,7 +83,8 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
     nelem = min(realChunkSize, size-offset);
 
     // Final wait/copy.
-    prims.directRecv(thisOutput+offset, offset, nelem);
+    prims.directRecv(thisOutput+offset, offset, nelem/4);
+    //prims.directRecv(thisOutput+offset, offset, nelem);
   }
 }
 
