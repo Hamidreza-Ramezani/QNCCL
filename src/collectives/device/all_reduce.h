@@ -635,52 +635,108 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*chunkSize;
   const ssize_t size = args->coll.count;
 
+  //if (tid == 0 && blockIdx.x == 0 && (&channel->treeUp)->up == 0) { 
+  //  printf("tree is called\n");
+  //} 
 
-  //printf("2\n");
 
   if (loopSize > size) {
     chunkSize = DIVUP(size, nChannels*minChunkSize)*minChunkSize;
   }
 
-  // Compute pointers
-  const T * __restrict__ thisInput = (const T*)args->sendbuff;
-  T * __restrict__ thisOutput = (T*)args->recvbuff;
+  if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
 
-  do {
-    struct ncclTree* tree = &channel->treeUp;
-    // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
-    ncclPrimitives<UNROLL/2, 1, 1, T, NCCL_MAX_TREE_ARITY, 1, 0, FUNC> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize, channel, comm);
-    for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
-      // Up
-      ssize_t offset = gridOffset + bid*chunkSize;
-      int nelem = min(chunkSize, size-offset);
-      if (tree->up == -1) {
-        prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
-      } else if (tree->down[0] == -1) {
-        prims.send(thisInput+offset, nelem);
-      } else {
-        prims.recvReduceSend(thisInput+offset, nelem);
-      }
-    }
-  } while(0);
+    // Compute pointers
+    const float * __restrict__ thisInput = (const float*)args->sendbuff;
+    float * __restrict__ thisOutput = (float*)args->recvbuff;
+    float * __restrict__ temp = (float*)comm->tempbuff3;
 
-  do {
-    struct ncclTree* tree = &channel->treeDn;
-    // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
-    ncclPrimitives<UNROLL/2, 1, 1, T, 1, NCCL_MAX_TREE_ARITY, 1, FUNC> prims(tid, nthreads, &tree->up, tree->down, thisOutput, stepSize, channel, comm);
-    for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
-      // Down
-      ssize_t offset = gridOffset + bid*chunkSize;
-      int nelem = min(chunkSize, size-offset);
-      if (tree->up == -1) {
-        prims.directSend(thisOutput+offset, offset, nelem);
-      } else if (tree->down[0] == -1) {
-        prims.directRecv(thisOutput+offset, offset, nelem);
-      } else {
-        prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+    do {
+      struct ncclTree* tree = &channel->treeUp;
+      // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
+      ncclPrimitives<UNROLL/2, 1, 1, float, NCCL_MAX_TREE_ARITY, 1, 0, FuncSum<float>> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize, channel, comm);
+      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        // Up
+        ssize_t offset = gridOffset + bid*chunkSize;
+        int nelem = min(chunkSize, size-offset);
+        if (tree->up == -1) {
+          //prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
+          prims.recv(temp+offset, nelem);
+          for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+            temp[idx] = temp[idx] + thisInput[idx];
+            thisOutput[idx] = temp[idx];
+          }
+        } else if (tree->down[0] == -1) {
+          prims.send(thisInput+offset, nelem);
+        } else {
+          //prims.recvReduceSend(thisInput+offset, nelem);
+          prims.recv(temp+offset, nelem);
+          for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+            temp[idx] = temp[idx] + thisInput[idx];
+          }
+          prims.send(temp+offset, nelem);
+        }
       }
-    }
-  } while(0);
+    } while(0);
+
+    do {
+      struct ncclTree* tree = &channel->treeDn;
+      // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
+      ncclPrimitives<UNROLL/2, 1, 1, float, 1, NCCL_MAX_TREE_ARITY, 1, FuncSum<float>> prims(tid, nthreads, &tree->up, tree->down, thisOutput, stepSize, channel, comm);
+      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        // Down
+        ssize_t offset = gridOffset + bid*chunkSize;
+        int nelem = min(chunkSize, size-offset);
+        if (tree->up == -1) {
+          prims.directSend(thisOutput+offset, offset, nelem);
+        } else if (tree->down[0] == -1) {
+          prims.directRecv(thisOutput+offset, offset, nelem);
+        } else {
+          prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+        }
+      }
+    } while(0);
+  } else {
+      // Compute pointers
+      const T * __restrict__ thisInput = (const T*)args->sendbuff;
+      T * __restrict__ thisOutput = (T*)args->recvbuff;
+
+      do {
+        struct ncclTree* tree = &channel->treeUp;
+        // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
+        ncclPrimitives<UNROLL/2, 1, 1, T, NCCL_MAX_TREE_ARITY, 1, 0, FUNC> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize, channel, comm);
+        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+          // Up
+          ssize_t offset = gridOffset + bid*chunkSize;
+          int nelem = min(chunkSize, size-offset);
+          if (tree->up == -1) {
+            prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
+          } else if (tree->down[0] == -1) {
+            prims.send(thisInput+offset, nelem);
+          } else {
+            prims.recvReduceSend(thisInput+offset, nelem);
+          }
+        }
+      } while(0);
+
+      do {
+        struct ncclTree* tree = &channel->treeDn;
+        // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
+        ncclPrimitives<UNROLL/2, 1, 1, T, 1, NCCL_MAX_TREE_ARITY, 1, FUNC> prims(tid, nthreads, &tree->up, tree->down, thisOutput, stepSize, channel, comm);
+        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+          // Down
+          ssize_t offset = gridOffset + bid*chunkSize;
+          int nelem = min(chunkSize, size-offset);
+          if (tree->up == -1) {
+            prims.directSend(thisOutput+offset, offset, nelem);
+          } else if (tree->down[0] == -1) {
+            prims.directRecv(thisOutput+offset, offset, nelem);
+          } else {
+            prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+          }
+        }
+      } while(0);
+  }
 }
 
 template<int UNROLL, class FUNC, typename T>
