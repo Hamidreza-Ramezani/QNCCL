@@ -666,26 +666,15 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
         ssize_t offset = gridOffset + bid*chunkSize;
         int nelem = min(chunkSize, size-offset);
 
-        ssize_t compressed_offset;
-        int nelem_compressed;
-        int pre_num_buckets;
-        size_t pre_meta_size;
-        int num_buckets; 
-        size_t meta_size;
+        int num_buckets = DIVUP(nelem, bucket_size);
+        size_t meta_size = 2 * sizeof(float) * num_buckets;   
+        int  pre_num_buckets = DIVUP(offset, bucket_size);
+        size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+        ssize_t compressed_offset = offset+pre_meta_size;
+        int nelem_compressed = DIVUP(nelem, 8/BITS);
 
         if (tree->up == -1) {
           //prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
-          //prims.recv(decompressed_temp+offset, nelem);
-          //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-          //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
-          //  thisOutput[idx] = decompressed_temp[idx];
-          //}
-          num_buckets = DIVUP(nelem, bucket_size);
-          meta_size = 2 * sizeof(float) * num_buckets;   
-          pre_num_buckets = DIVUP(offset, bucket_size);
-          pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
-          compressed_offset = offset+pre_meta_size;
-          nelem_compressed = DIVUP(nelem, 8/BITS);
           prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
           dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
           for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
@@ -695,37 +684,18 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
           dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
         } else if (tree->down[0] == -1) {
           //prims.send(thisInput+offset, nelem);
-          num_buckets = DIVUP(nelem, bucket_size);
-          meta_size = 2 * sizeof(float) * num_buckets;
-          pre_num_buckets = DIVUP(offset, bucket_size);
-          pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
-          compressed_offset = offset+pre_meta_size;
           quantize(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
-          nelem_compressed = DIVUP(nelem, 8/BITS);
           prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
 
         } else {
           //prims.recvReduceSend(thisInput+offset, nelem);
-          //prims.recv(decompressed_temp+offset, nelem);
-          //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-          //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
-          //}
-          //prims.send(decompressed_temp+offset, nelem);
-        
-          num_buckets = DIVUP(nelem, bucket_size);
-          meta_size = 2 * sizeof(float) * num_buckets;   
-          pre_num_buckets = DIVUP(offset, bucket_size);
-          pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
-          compressed_offset = offset+pre_meta_size;
-          nelem_compressed = DIVUP(nelem, 8/BITS);
           prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
-        dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
+          dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
           for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
             decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
           }
-        quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
-        nelem_compressed = DIVUP(nelem, 8/BITS);
-        prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+          quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+          prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
         }
       }
     } while(0);
