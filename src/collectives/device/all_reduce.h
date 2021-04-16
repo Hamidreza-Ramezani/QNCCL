@@ -646,35 +646,85 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
 
+    int bucket_size = args->bucket_size;
+    curandState* devStates = (curandState*)comm->states;
+    const int BITS=args->BITS;
+    setup_kernel(devStates);
     // Compute pointers
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
     float * __restrict__ thisOutput = (float*)args->recvbuff;
-    float * __restrict__ temp = (float*)comm->tempbuff3;
+
+    unsigned char* __restrict__ compressed_temp = (unsigned char*)comm->tempbuff1;
+    float * __restrict__ decompressed_temp = (float*)comm->tempbuff3;
 
     do {
       struct ncclTree* tree = &channel->treeUp;
       // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
-      ncclPrimitives<UNROLL/2, 1, 1, float, NCCL_MAX_TREE_ARITY, 1, 0, FuncSum<float>> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize, channel, comm);
+      ncclPrimitives<UNROLL/2, 1, 1, unsigned char, NCCL_MAX_TREE_ARITY, 1, 0, FuncSum<unsigned char>> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize*4, channel, comm);
       for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
         // Up
         ssize_t offset = gridOffset + bid*chunkSize;
         int nelem = min(chunkSize, size-offset);
+
+        ssize_t compressed_offset;
+        int nelem_compressed;
+        int pre_num_buckets;
+        size_t pre_meta_size;
+        int num_buckets; 
+        size_t meta_size;
+
         if (tree->up == -1) {
           //prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
-          prims.recv(temp+offset, nelem);
+          //prims.recv(decompressed_temp+offset, nelem);
+          //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+          //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
+          //  thisOutput[idx] = decompressed_temp[idx];
+          //}
+          num_buckets = DIVUP(nelem, bucket_size);
+          meta_size = 2 * sizeof(float) * num_buckets;   
+          pre_num_buckets = DIVUP(offset, bucket_size);
+          pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+          compressed_offset = offset+pre_meta_size;
+          nelem_compressed = DIVUP(nelem, 8/BITS);
+          prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+          dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
           for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-            temp[idx] = temp[idx] + thisInput[idx];
-            thisOutput[idx] = temp[idx];
+            decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
+            thisOutput[idx] = decompressed_temp[idx];
           }
         } else if (tree->down[0] == -1) {
-          prims.send(thisInput+offset, nelem);
+          //prims.send(thisInput+offset, nelem);
+          num_buckets = DIVUP(nelem, bucket_size);
+          meta_size = 2 * sizeof(float) * num_buckets;
+          pre_num_buckets = DIVUP(offset, bucket_size);
+          pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+          compressed_offset = offset+pre_meta_size;
+          quantize(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+          nelem_compressed = DIVUP(nelem, 8/BITS);
+          prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+
         } else {
           //prims.recvReduceSend(thisInput+offset, nelem);
-          prims.recv(temp+offset, nelem);
+          //prims.recv(decompressed_temp+offset, nelem);
+          //for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+          //  decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
+          //}
+          //prims.send(decompressed_temp+offset, nelem);
+        
+          num_buckets = DIVUP(nelem, bucket_size);
+          meta_size = 2 * sizeof(float) * num_buckets;   
+          pre_num_buckets = DIVUP(offset, bucket_size);
+          pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+          compressed_offset = offset+pre_meta_size;
+          nelem_compressed = DIVUP(nelem, 8/BITS);
+          prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+        dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
           for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-            temp[idx] = temp[idx] + thisInput[idx];
+            decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
           }
-          prims.send(temp+offset, nelem);
+        quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+        nelem_compressed = DIVUP(nelem, 8/BITS);
+        prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
         }
       }
     } while(0);
