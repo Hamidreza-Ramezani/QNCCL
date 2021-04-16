@@ -690,8 +690,9 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
           dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
           for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
             decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
-            thisOutput[idx] = decompressed_temp[idx];
           }
+          quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+          dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
         } else if (tree->down[0] == -1) {
           //prims.send(thisInput+offset, nelem);
           num_buckets = DIVUP(nelem, bucket_size);
@@ -732,17 +733,31 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
     do {
       struct ncclTree* tree = &channel->treeDn;
       // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
-      ncclPrimitives<UNROLL/2, 1, 1, float, 1, NCCL_MAX_TREE_ARITY, 1, FuncSum<float>> prims(tid, nthreads, &tree->up, tree->down, thisOutput, stepSize, channel, comm);
+      ncclPrimitives<UNROLL/2, 1, 1, unsigned char, 1, NCCL_MAX_TREE_ARITY, 1, FuncSum<unsigned char>> prims(tid, nthreads, &tree->up, tree->down, (unsigned char*)thisOutput, stepSize*4, channel, comm);
       for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
         // Down
         ssize_t offset = gridOffset + bid*chunkSize;
         int nelem = min(chunkSize, size-offset);
+
+        int num_buckets = DIVUP(nelem, bucket_size);
+        size_t meta_size = 2 * sizeof(float) * num_buckets;   
+        int  pre_num_buckets = DIVUP(offset, bucket_size);
+        size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+        ssize_t compressed_offset = offset+pre_meta_size;
+        int nelem_compressed = DIVUP(nelem, 8/BITS);
+
         if (tree->up == -1) {
-          prims.directSend(thisOutput+offset, offset, nelem);
+          //prims.directSend(thisOutput+offset, offset, nelem);
+          prims.directSend(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
         } else if (tree->down[0] == -1) {
-          prims.directRecv(thisOutput+offset, offset, nelem);
+          //prims.directRecv(thisOutput+offset, offset, nelem);
+
+          prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
+          dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
         } else {
-          prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+          //prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+          prims.directRecvCopySend(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
+          dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);    
         }
       }
     } while(0);
