@@ -613,52 +613,140 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
   const ssize_t loopSize = nChannels*chunkSize;
   const ssize_t size = args->coll.count;
 
+  //if (tid == 0 && blockIdx.x == 0 && (&channel->treeUp)->up == 0) { 
+  //  printf("tree is called\n");
+  //} 
 
-  //printf("2\n");
 
   if (loopSize > size) {
     chunkSize = DIVUP(size, nChannels*minChunkSize)*minChunkSize;
   }
 
-  // Compute pointers
-  const T * __restrict__ thisInput = (const T*)args->sendbuff;
-  T * __restrict__ thisOutput = (T*)args->recvbuff;
+  if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
 
-  do {
-    struct ncclTree* tree = &channel->treeUp;
-    // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
-    ncclPrimitives<UNROLL/2, 1, 1, T, NCCL_MAX_TREE_ARITY, 1, 0, FUNC> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize, channel, comm);
-    for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
-      // Up
-      ssize_t offset = gridOffset + bid*chunkSize;
-      int nelem = min(chunkSize, size-offset);
-      if (tree->up == -1) {
-        prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
-      } else if (tree->down[0] == -1) {
-        prims.send(thisInput+offset, nelem);
-      } else {
-        prims.recvReduceSend(thisInput+offset, nelem);
-      }
-    }
-  } while(0);
+    int bucket_size = args->bucket_size;
+    const int BITS=args->BITS;
+    // Compute pointers
+    const float * __restrict__ thisInput = (const float*)args->sendbuff;
+    float * __restrict__ thisOutput = (float*)args->recvbuff;
 
-  do {
-    struct ncclTree* tree = &channel->treeDn;
-    // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
-    ncclPrimitives<UNROLL/2, 1, 1, T, 1, NCCL_MAX_TREE_ARITY, 1, FUNC> prims(tid, nthreads, &tree->up, tree->down, thisOutput, stepSize, channel, comm);
-    for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
-      // Down
-      ssize_t offset = gridOffset + bid*chunkSize;
-      int nelem = min(chunkSize, size-offset);
-      if (tree->up == -1) {
-        prims.directSend(thisOutput+offset, offset, nelem);
-      } else if (tree->down[0] == -1) {
-        prims.directRecv(thisOutput+offset, offset, nelem);
-      } else {
-        prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+    unsigned char* __restrict__ compressed_temp = (unsigned char*)comm->tempbuff1;
+    float * __restrict__ decompressed_temp = (float*)comm->tempbuff3;
+
+    do {
+      struct ncclTree* tree = &channel->treeUp;
+      // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
+      ncclPrimitives<UNROLL/2, 1, 1, unsigned char, NCCL_MAX_TREE_ARITY, 1, 0, FuncSum<unsigned char>> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize*4, channel, comm);
+      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        // Up
+        ssize_t offset = gridOffset + bid*chunkSize;
+        int nelem = min(chunkSize, size-offset);
+
+        int num_buckets = DIVUP(nelem, bucket_size);
+        size_t meta_size = 2 * sizeof(float) * num_buckets;   
+        int  pre_num_buckets = DIVUP(offset, bucket_size);
+        size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+        ssize_t compressed_offset = offset+pre_meta_size;
+        int nelem_compressed = DIVUP(nelem, 8/BITS);
+
+        if (tree->up == -1) {
+          //prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
+          prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+          dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
+          for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+            decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
+          }
+          quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS);
+          dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
+        } else if (tree->down[0] == -1) {
+          //prims.send(thisInput+offset, nelem);
+          quantize(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS);
+          prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+
+        } else {
+          //prims.recvReduceSend(thisInput+offset, nelem);
+          prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+          dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
+          for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
+            decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
+          }
+          quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS);
+          prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+        }
       }
-    }
-  } while(0);
+    } while(0);
+
+    do {
+      struct ncclTree* tree = &channel->treeDn;
+      // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
+      ncclPrimitives<UNROLL/2, 1, 1, unsigned char, 1, NCCL_MAX_TREE_ARITY, 1, FuncSum<unsigned char>> prims(tid, nthreads, &tree->up, tree->down, (unsigned char*)thisOutput, stepSize*4, channel, comm);
+      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+        // Down
+        ssize_t offset = gridOffset + bid*chunkSize;
+        int nelem = min(chunkSize, size-offset);
+
+        int num_buckets = DIVUP(nelem, bucket_size);
+        size_t meta_size = 2 * sizeof(float) * num_buckets;   
+        int  pre_num_buckets = DIVUP(offset, bucket_size);
+        size_t pre_meta_size = 2 * sizeof(float) * pre_num_buckets;
+        ssize_t compressed_offset = offset+pre_meta_size;
+        int nelem_compressed = DIVUP(nelem, 8/BITS);
+
+        if (tree->up == -1) {
+          //prims.directSend(thisOutput+offset, offset, nelem);
+          prims.directSend(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
+        } else if (tree->down[0] == -1) {
+          //prims.directRecv(thisOutput+offset, offset, nelem);
+          prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
+          dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
+        } else {
+          //prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+          prims.directRecvCopySend(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
+          dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);    
+        }
+      }
+    } while(0);
+  } else {
+      // Compute pointers
+      const T * __restrict__ thisInput = (const T*)args->sendbuff;
+      T * __restrict__ thisOutput = (T*)args->recvbuff;
+
+      do {
+        struct ncclTree* tree = &channel->treeUp;
+        // Reduce : max number of recv is 3, max number of send is 1 (binary tree + local)
+        ncclPrimitives<UNROLL/2, 1, 1, T, NCCL_MAX_TREE_ARITY, 1, 0, FUNC> prims(tid, nthreads, tree->down, &tree->up, NULL, stepSize, channel, comm);
+        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+          // Up
+          ssize_t offset = gridOffset + bid*chunkSize;
+          int nelem = min(chunkSize, size-offset);
+          if (tree->up == -1) {
+            prims.recvReduceCopy(thisInput+offset, thisOutput+offset, nelem);
+          } else if (tree->down[0] == -1) {
+            prims.send(thisInput+offset, nelem);
+          } else {
+            prims.recvReduceSend(thisInput+offset, nelem);
+          }
+        }
+      } while(0);
+
+      do {
+        struct ncclTree* tree = &channel->treeDn;
+        // Broadcast : max number of recv is 1, max number of send is 3 (binary tree + local)
+        ncclPrimitives<UNROLL/2, 1, 1, T, 1, NCCL_MAX_TREE_ARITY, 1, FUNC> prims(tid, nthreads, &tree->up, tree->down, thisOutput, stepSize, channel, comm);
+        for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += loopSize) {
+          // Down
+          ssize_t offset = gridOffset + bid*chunkSize;
+          int nelem = min(chunkSize, size-offset);
+          if (tree->up == -1) {
+            prims.directSend(thisOutput+offset, offset, nelem);
+          } else if (tree->down[0] == -1) {
+            prims.directRecv(thisOutput+offset, offset, nelem);
+          } else {
+            prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+          }
+        }
+      } while(0);
+  }
 }
 
 template<int UNROLL, class FUNC, typename T>
