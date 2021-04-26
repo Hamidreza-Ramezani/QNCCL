@@ -45,12 +45,12 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   
   
    //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
-   //   printf("bucket size is %d\n", bucket_size);
+   //   printf("qnccl is called \n");
    //}
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
     //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
-    //   printf("buffer size is %d\n", (int)size);
+    //   printf("float is called\n");
     //}
     //const int BITS=8;
     const int BITS=args->BITS;
