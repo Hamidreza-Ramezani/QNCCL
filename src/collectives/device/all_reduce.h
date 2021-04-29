@@ -44,14 +44,14 @@ __device__ void ncclAllReduceRingKernel(struct CollectiveArgs* args) {
   int bucket_size = args->bucket_size;
   
   
-   if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
-      printf("qnccl is called\n");
-   }
+   //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
+   //   printf("qnccl is called\n");
+   //}
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
-    if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
-       printf("float is called\n");
-    }
+    //if (tid == 0 && bid == 0 && ring->devUserRanks[0] == 0) {     
+    //   printf("float is called\n");
+    //}
     //const int BITS=8;
     const int BITS=args->BITS;
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
