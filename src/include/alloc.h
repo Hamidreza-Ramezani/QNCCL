@@ -1,5 +1,5 @@
 /*************************************************************************
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * See LICENSE.txt for license information
  ************************************************************************/
@@ -15,6 +15,7 @@ template <typename T>
 static ncclResult_t ncclCudaHostCalloc(T** ptr, size_t nelem) {
   CUDACHECK(cudaHostAlloc(ptr, nelem*sizeof(T), cudaHostAllocMapped));
   memset(*ptr, 0, nelem*sizeof(T));
+  INFO(NCCL_ALLOC, "Cuda Host Alloc Size %ld pointer %p", nelem*sizeof(T), *ptr);
   return ncclSuccess;
 }
 
@@ -32,13 +33,20 @@ static ncclResult_t ncclCalloc(T** ptr, size_t nelem) {
   }
   memset(p, 0, nelem*sizeof(T));
   *ptr = (T*)p;
+  INFO(NCCL_ALLOC, "Mem Alloc Size %ld pointer %p", nelem*sizeof(T), *ptr);
   return ncclSuccess;
 }
 
 template <typename T>
 static ncclResult_t ncclCudaCalloc(T** ptr, size_t nelem) {
+  // Need async stream for P2P pre-connect + CUDA Graph
+  cudaStream_t stream;
+  CUDACHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
   CUDACHECK(cudaMalloc(ptr, nelem*sizeof(T)));
-  CUDACHECK(cudaMemset(*ptr, 0, nelem*sizeof(T)));
+  CUDACHECK(cudaMemsetAsync(*ptr, 0, nelem*sizeof(T), stream));
+  CUDACHECK(cudaStreamSynchronize(stream));
+  CUDACHECK(cudaStreamDestroy(stream));
+  INFO(NCCL_ALLOC, "Cuda Alloc Size %ld pointer %p", nelem*sizeof(T), *ptr);
   return ncclSuccess;
 }
 
@@ -59,6 +67,7 @@ static ncclResult_t ncclIbMalloc(void** ptr, size_t size) {
   if (ret != 0) return ncclSystemError;
   memset(p, 0, size);
   *ptr = p;
+  INFO(NCCL_ALLOC, "Ib Alloc Size %ld pointer %p", size, *ptr);
   return ncclSuccess;
 }
 

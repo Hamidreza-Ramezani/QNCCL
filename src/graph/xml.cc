@@ -1,5 +1,5 @@
 /*************************************************************************
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * See LICENSE.txt for license information
  ************************************************************************/
@@ -469,6 +469,28 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
     if (path == NULL) NCCLCHECK(getPciPath(busId, &path));
     NCCLCHECK(ncclTopoSetAttrFromSys(pciNode, path, "class", "class"));
   }
+  ncclDebugNoWarn = NCCL_GRAPH;
+  NCCLCHECK(xmlGetAttrIndex(pciNode, "vendor", &index));
+  if (index == -1) {
+    if (path == NULL) getPciPath(busId, &path);
+    if (path) ncclTopoSetAttrFromSys(pciNode, path, "vendor", "vendor");
+  }
+  NCCLCHECK(xmlGetAttrIndex(pciNode, "device", &index));
+  if (index == -1) {
+    if (path == NULL) getPciPath(busId, &path);
+    if (path) ncclTopoSetAttrFromSys(pciNode, path, "device", "device");
+  }
+  NCCLCHECK(xmlGetAttrIndex(pciNode, "subsystem_vendor", &index));
+  if (index == -1) {
+    if (path == NULL) getPciPath(busId, &path);
+    if (path) ncclTopoSetAttrFromSys(pciNode, path, "subsystem_vendor", "subsystem_vendor");
+  }
+  NCCLCHECK(xmlGetAttrIndex(pciNode, "subsystem_device", &index));
+  if (index == -1) {
+    if (path == NULL) getPciPath(busId, &path);
+    if (path) ncclTopoSetAttrFromSys(pciNode, path, "subsystem_device", "subsystem_device");
+  }
+  ncclDebugNoWarn = 0;
   NCCLCHECK(xmlGetAttrIndex(pciNode, "link_speed", &index));
   if (index == -1) {
     if (path == NULL) NCCLCHECK(getPciPath(busId, &path));
