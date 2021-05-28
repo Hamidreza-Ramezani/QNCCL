@@ -1,92 +1,91 @@
-# NCCL
-
-Optimized primitives for collective multi-GPU communication.
+# QNCCL
+Communication-Efficient primitives for inter-GPU communication via quantization and encoding
 
 ## Introduction
+In this library, we optimized the all-reduce primitive (Ring and Tree algorithms) of [NCCL](https://github.com/nvidia/nccl) to achieve higherbandwidth via compression. In fact, each device compresses its buffer before broadcasting it to other devices. Besides, devices will decompress the received buffer. We used max-min method in this work. The details of compression scheme can be found in this [paper](https://arxiv.org/abs/1610.02132). Max-min is a lossy compression scheme. This means there would be a negligible error in our all-reduce operation compared to the [original](https://github.com/NVIDIA/nccl/blob/master/src/collectives/all_reduce.cc) one. But, that does not affect the convergence results of machine learning experiments.
 
-NCCL (pronounced "Nickel") is a stand-alone library of standard collective communication routines for GPUs, implementing all-reduce, all-gather, reduce, broadcast, and reduce-scatter. It has been optimized to achieve high bandwidth on platforms using PCIe, NVLink, NVswitch, as well as networking using InfiniBand Verbs or TCP/IP sockets. NCCL supports an arbitrary number of GPUs installed in a single node or across multiple nodes, and can be used in either single- or multi-process (e.g., MPI) applications.
-
-For more information on NCCL usage, please refer to the [NCCL documentation](https://docs.nvidia.com/deeplearning/sdk/nccl-developer-guide/index.html).
-
-## What's inside
-
-At present, the library implements the following collectives operations:
-
-- all-reduce
-- all-gather
-- reduce-scatter
-- reduce
-- broadcast
-
-These operations are implemented using ring algorithms and have been optimized for throughput and latency. For best performance, small operations can be either batched into larger operations or aggregated through the API.
-
-## Requirements
-
-NCCL requires at least CUDA 7.0 and Kepler or newer GPUs. For PCIe based platforms, best performance is achieved when all GPUs are located on a common PCIe root complex, but multi-socket configurations are also supported.
 
 ## Build
+use the following steps to build QNCCL from source. 
+    
+    $ git clone https://github.com/hamid-ramezani/QNCCL.git
+    $ cd QNCCL
+    $ export CUDA_HOME=<path to cuda install>
+    $ make -j src.build 
+By specifying the architecture of the target platform, the compilation process will be much faster. That can be done by `NVCC_GENCODE` flag. For instance, if the compute capability of the target platform is sm70, the last command should be changed to:
 
-Note: the official and tested builds of NCCL can be downloaded from: https://developer.nvidia.com/nccl. You can skip the following build steps if you choose to use the official builds.
+    $ make -j src.build NVCC_GENCODE="-gencode=arch=compute_70,code=sm_70"
 
-To build the library :
 
-```shell
-$ cd nccl
-$ make -j src.build
-```
+## Build QNCCL-tests
 
-If CUDA is not installed in the default /usr/local/cuda path, you can define the CUDA path with :
+Tests for QNCCL are maintained separately [here](https://github.com/hamid-ramezani/QNCCL-tests). It is used for both correctness and performance of collective operations.  To build QNCCL_tests, use the following commands: 
 
-```shell
-$ make src.build CUDA_HOME=<path to cuda install>
-```
+    $ git clone https://github.com/hamid-ramezani/QNCCL-tests
+    $ cd QNCCL-tests
+    $ export NCCL_HOME=<path to nccl build folder>
+    $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:path_to_QNCCL/build/lib
+    $ export CUDA_HOME=<path to cuda install>
+    $ make 
 
-NCCL will be compiled and installed in `build/` unless `BUILDDIR` is set.
 
-By default, NCCL is compiled for all supported architectures. To accelerate the compilation and reduce the binary size, consider redefining `NVCC_GENCODE` (defined in `makefiles/common.mk`) to only include the architecture of the target platform :
-```shell
-$ make -j src.build NVCC_GENCODE="-gencode=arch=compute_70,code=sm_70"
-```
+## Environment
+QNCCL has three additional environment variables to NCCL set of [environment variables](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html). They are `RING_ALLREDUCE_VERSION` , `bucket_size` , and `BITS`. 
 
-## Install
+ 1. `RING_ALLREDUCE_VERSION`: This is for choosing to use the original implementation of all_reduce (in NCCL) or using the new one (in QNCCL). Its value can be either `old` or `new`. The default value is `old`.
+ 2. `bucket_size` : This specifies the size of bucket used in max-min quantization. It can accept any positive value, but we suggest to use a power of two. The default value is `1024`.   
+ 3. `BITS`: This specifies the number of bits after applying the compression operator. It accepts any value between 1 to 32. The default value is `8`. The lower the `BITS`,  the stronger the compression. 
 
-To install NCCL on the system, create a package then install it as root.
+We suggest to set the following environment variables before using QNCCL:
 
-Debian/Ubuntu :
-```shell
-$ # Install tools to create debian packages
-$ sudo apt install build-essential devscripts debhelper fakeroot
-$ # Build NCCL deb package
-$ make pkg.debian.build
-$ ls build/pkg/deb/
-```
+    $ export NCCL_ALGO=Ring
+    $ export NCCL_PROTO=Simple
+    $ export RING_ALLREDUCE_VERSION=new
+    $ export NCCL_MIN_NCHANNELS=64
+    $ export NCCL_NTHREADS=512
+    $ export bucket_size=1024
+    $ export BITS=8
 
-RedHat/CentOS :
-```shell
-$ # Install tools to create rpm packages
-$ sudo yum install rpm-build rpmdevtools
-$ # Build NCCL rpm package
-$ make pkg.redhat.build
-$ ls build/pkg/rpm/
-```
+#### Caveats
 
-OS-agnostic tarball :
-```shell
-$ make pkg.txz.build
-$ ls build/pkg/txz/
-```
+ - `NCCL_ALGO` can be set to `Tree` as well since we added our compression scheme to the Tree algorithm either. 
 
-## Tests
 
-Tests for NCCL are maintained separately at https://github.com/nvidia/nccl-tests.
+## Quick example
 
-```shell
-$ git clone https://github.com/NVIDIA/nccl-tests.git
-$ cd nccl-tests
-$ make
-$ ./build/all_reduce_perf -b 8 -e 256M -f 2 -g <ngpus>
-```
+    $ cd QNCCL-tests
+    $ ./build/all_reduce_perf -b 4 -e 1G -d float -f 2 -n 5 -w 1 -g 8
+
+The above example runs all_reduce on 8 GPUs. The inputs size varies from 4Bytes  to 1GBytes. In each step, the input size is doubled (This is specified by `-f` flag). There is one warm-up iteration (`-n` flag). Each element of the input and output buffers is a single-precision floating point number ( `-d` option). The complete list of arguments can be found [here](https://github.com/nvidia/nccl-tests#arguments). 
+
+
+## Results
+
+Our results show that QNCCL is ~4x faster than NCCL in applying `all_reduce` on large buffers (bigger than 100MBytes). So, it is suggested to use QNCCL for applications in which the buffers need to be reduced are big enough, though our implementation has gain for all buffers of size > 1MBytes. 
+
+
+## Machine learning experiments
+QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used as the communication back-end in distributed training. To do so, Pytorch has to be compiled from source. The steps for building Pytorch from source and linking it to QNCCL is as follows: 
+
+    $ export NCCL_ROOT=<path_to_QNCCL>
+    $ export NCCL_LIB_DIR=<path_to_QNCCL_lib_dir>
+    $ export NCCL_INCLUDE_DIR=<path_to_QNCCL_include_dir>
+    $ conda install astunparse numpy ninja pyyaml mkl mkl-include setuptools cmake cffi typing_extensions future six requests dataclasses
+    $ conda install -c pytorch magma-cuda110  # or the magma-cuda* that matches your CUDA version from https://anaconda.org/pytorch/repo
+    $ git clone --recursive https://github.com/pytorch/pytorch
+    $ cd pytorch
+    $ git submodule sync
+    $ git submodule update --init --recursive
+    $ export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
+    $ USE_SYSTEM_NCCL=1 USE_STATIC_NCCL=0 python setup.py install
+
+#### Caveats
+If the architecture of the target platform is `GeForce RTX 3090` , the nightly version of Pytorch needs to be compiled. That version is available in [this](https://github.com/pytorch/pytorch/tree/nightly) branch.  So, the following step must be done after cloning Pytorch:
+
+    $ git checkout nightly
+
+
 
 ## Copyright
 
-All source code and accompanying documentation is copyright (c) 2015-2019, NVIDIA CORPORATION. All rights reserved.
+All source code and accompanying documentation is copyright (c) 2015-2020, NVIDIA CORPORATION. All rights reserved.
