@@ -78,7 +78,6 @@ If the architecture of the target platform is `GeForce RTX 3090` , the nightly v
 
 
 
-```
 ## Copyright
 
 All source code and accompanying documentation is copyright (c) 2015-2020, NVIDIA CORPORATION. All rights reserved.
