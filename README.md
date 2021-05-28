@@ -4,6 +4,7 @@ Communication-Efficient primitives for inter-GPU communication via quantization 
 ## Introduction
 In this library, we optimized the all-reduce primitive (Ring and Tree algorithms) of [NCCL](https://github.com/nvidia/nccl) to achieve higher bandwidth via compression. In fact, each device compresses its buffer before sending it to another device. Besides, devices will decompress the received buffer. We used max-min method in this work, which is a lossy compression scheme.  This means there would be a negligible error in our all-reduce operation compared to the [original](https://github.com/NVIDIA/nccl/blob/master/src/collectives/all_reduce.cc) one. But, that does not affect the overall results of machine learning experiments.
 
+
 ## Build
 use the following steps to build QNCCL from source. 
     
@@ -15,6 +16,7 @@ By specifying the device architecture, the compilation process will be much fast
 
     $ make -j src.build NVCC_GENCODE="-gencode=arch=compute_70,code=sm_70"
 
+
 ## Build QNCCL-tests
 
 Tests for QNCCL are maintained separately [here](https://github.com/hamid-ramezani/QNCCL-tests). It is used for both correctness and performance of collective operations.  To build QNCCL_tests, use the following commands: 
@@ -25,6 +27,7 @@ Tests for QNCCL are maintained separately [here](https://github.com/hamid-rameza
     $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:path_to_QNCCL/build/lib
     $ export CUDA_HOME=<path to cuda install>
     $ make 
+
 
 ## Environment
 QNCCL has three additional environment variables to NCCL set of [environment variables](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html). They are `RING_ALLREDUCE_VERSION` , `bucket_size` , and `BITS`. 
@@ -46,6 +49,7 @@ We suggest to set the following environment variables before using QNCCL:
 
  - `NCCL_ALGO` can be set to `Tree` as well since we added our compression scheme to the Tree algorithm either. 
 
+
 ## Quick example
 
     $ cd QNCCL-tests
@@ -53,9 +57,11 @@ We suggest to set the following environment variables before using QNCCL:
 
 The above example runs all_reduce on 8 GPUs. The inputs size varies from 4Bytes  to 1GBytes. In each step, the input size is doubled (This is specified by `-f` flag). There is one warm-up iteration (`-n` flag). Each element of the input and output buffers is a single-precision floating point number ( `-d` option). The complete list of arguments can be found [here](https://github.com/nvidia/nccl-tests#arguments). 
 
+
 ## Results
 
 Our results show that QNCCL is ~4x faster than NCCL in applying `all_reduce` on large buffers (bigger than 100MBytes). So, it is suggested to use QNCCL for applications in which the buffers need to be reduced are big enough, though our implementation has gain for all buffers of size > 1MBytes. 
+
 
 ## Machine learning experiments
 QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used as the communication back-end in distributed training. To do so, Pytorch has to be compiled from source. The steps for building Pytorch from source and linking it to QNCCL is as follows: 
