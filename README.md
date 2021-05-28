@@ -12,7 +12,7 @@ use the following steps to build QNCCL from source.
     $ cd QNCCL
     $ export CUDA_HOME=<path to cuda install>
     $ make -j src.build 
-By specifying the architecture of the target platform, the compilation process will be much faster. That can done by `NVCC_GENCODE` flag. For instance, if the compute capability of the target platform is sm70, the last command should be changed to:
+By specifying the architecture of the target platform, the compilation process will be much faster. That can be done by `NVCC_GENCODE` flag. For instance, if the compute capability of the target platform is sm70, the last command should be changed to:
 
     $ make -j src.build NVCC_GENCODE="-gencode=arch=compute_70,code=sm_70"
 
