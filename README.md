@@ -2,7 +2,7 @@
 Communication-Efficient primitives for inter-GPU communication via quantization and encoding
 
 ## Introduction
-In this library, we optimized the all-reduce primitive (Ring and Tree algorithms) of [NCCL](https://github.com/nvidia/nccl) to achieve higher bandwidth via compression. In fact, each device compresses its buffer before sending it to another device. Besides, devices will decompress the received buffer. We used max-min method in this work, which is a lossy compression scheme.  This means there would be a negligible error in our all-reduce operation compared to the [original](https://github.com/NVIDIA/nccl/blob/master/src/collectives/all_reduce.cc) one. But, that does not affect the overall results of machine learning experiments.
+In this library, we optimized the all-reduce primitive (Ring and Tree algorithms) of [NCCL](https://github.com/nvidia/nccl) to achieve higherbandwidth via compression. In fact, each device compresses its buffer before broadcasting it to other devices. Besides, devices will decompress the received buffer. We used max-min method in this work. The details of compression scheme can be found in this [paper](https://arxiv.org/abs/1610.02132). Max-min is a lossy compression scheme. This means there would be a negligible error in our all-reduce operation compared to the [original](https://github.com/NVIDIA/nccl/blob/master/src/collectives/all_reduce.cc) one. But, that does not affect the convergence results of machine learning experiments.
 
 
 ## Build
