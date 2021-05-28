@@ -12,7 +12,7 @@ use the following steps to build QNCCL from source.
     $ cd QNCCL
     $ export CUDA_HOME=<path to cuda install>
     $ make -j src.build 
-By specifying the device architecture, the compilation process will be much faster. `NVCC_GENCODE` will only include the architecture of the target platform. For instance, if the compute capability of the target platform is sm70, the last command should be changed to:  
+By specifying the architecture of the target platform, the compilation process will be much faster. That can be specified by `NVCC_GENCODE` flag. For instance, if the compute capability of the target platform is sm70, the last command should be changed to:
 
     $ make -j src.build NVCC_GENCODE="-gencode=arch=compute_70,code=sm_70"
 
@@ -45,6 +45,7 @@ We suggest to set the following environment variables before using QNCCL:
     $ export NCCL_NTHREADS=512
     $ export bucket_size=1024
     $ export BITS=8
+
 #### Caveats
 
  - `NCCL_ALGO` can be set to `Tree` as well since we added our compression scheme to the Tree algorithm either. 
@@ -77,6 +78,7 @@ QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used 
     $ git submodule update --init --recursive
     $ export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
     $ USE_SYSTEM_NCCL=1 USE_STATIC_NCCL=0 python setup.py install
+
 #### Caveats
 If the architecture of the target platform is `GeForce RTX 3090` , the nightly version of Pytorch needs to be compiled. That version is available in [this](https://github.com/pytorch/pytorch/tree/nightly) branch.  So, the following step must be done after cloning Pytorch:
 
