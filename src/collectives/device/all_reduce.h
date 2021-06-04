@@ -32,7 +32,7 @@ inline __device__ void setup_kernel(curandState *state) {
     //  return;
     //}
     int id = threadIdx.x + blockIdx.x * blockDim.x;
-    curand_init(1234, 0, 0, &state[id]);
+    curand_init(1234, id, 0, &state[id]);
 }
 
 //inline __device__ void setup_kernel(curandStatePhilox4_32_10_t *state, int nthreads){
