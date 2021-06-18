@@ -209,6 +209,8 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
         //rand = 0.5;
         //rand = get_rand(states);
         rand = curand_uniform(&state);
+        //int sidx = floor(rand / 0.25);
+        //stats[sidx]++;
         int64_t encoded = MaxMinEncodeValue(input[idx], meta_info, rand);
         value += (encoded << (j * bits));
       }
@@ -223,6 +225,9 @@ inline __device__ void CompressBucket(float* input, unsigned char* output, float
 inline __device__ void quantize(float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
+  //if (num_elems < 0) { 
+  //  return;
+  //}
   int num_blocks = 1;
   int bid = 0;
 
@@ -241,6 +246,7 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
   //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
   //  find_meta_parallel(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, bits);
   //}
+  //int stats[4] = {};
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
     CompressBucket(
@@ -248,6 +254,11 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
         (meta + meta_multiplier * bucket_id),
         cur_bucket_size, bits, states);
   }
+  //if (threadIdx.x == 0 && blockIdx.x == 0 && gpuId == 0) {
+  //     for (int i = 0; i < 4; i++)
+  //       printf("%i ", stats[i]);
+  //     printf("\n");
+  //}
   __syncthreads();
 }
 
@@ -255,6 +266,9 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
 inline __device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
   //int num_blocks = gridDim.x;
   //int bid = blockIdx.x;
+  //if (num_elems < 0) { 
+  //  return;
+  //}
   int num_blocks = 1;
   int bid = 0;
 
@@ -273,6 +287,7 @@ inline __device__ void quantize(const float* input_data, unsigned char* output_d
   //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
   //  find_meta_parallel(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, bits);
   //}
+  //int stats[4] = {};
   for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
     cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
     CompressBucket(
@@ -280,6 +295,11 @@ inline __device__ void quantize(const float* input_data, unsigned char* output_d
         (meta + meta_multiplier * bucket_id),
         cur_bucket_size, bits, states);
   }
+  //if (threadIdx.x == 0 && blockIdx.x == 0 && gpuId == 0) {
+  //	for (int i = 0; i < 4; i++)
+  //	  printf("%i ", stats[i]);
+  //	printf("\n");
+  //}
   __syncthreads();
 }
 
