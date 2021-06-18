@@ -12,7 +12,7 @@ NCCL_API(ncclResult_t, ncclAllGather, const void* sendbuff, void* recvbuff, size
 ncclResult_t ncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcount,
     ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream) {
   struct ncclInfo info = { ncclCollAllGather, "AllGather",
-    sendbuff, recvbuff, sendcount, datatype, ncclSum, 0, comm, stream, /* Args */
+    sendbuff, recvbuff, NULL, NULL, sendcount, datatype, ncclSum, 0, comm, stream, /* Args */
     ALLGATHER_CHUNKSTEPS, ALLGATHER_SLICESTEPS };
   return ncclEnqueueCheck(&info);
 }

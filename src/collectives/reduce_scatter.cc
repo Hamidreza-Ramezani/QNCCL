@@ -12,7 +12,7 @@ NCCL_API(ncclResult_t, ncclReduceScatter, const void* sendbuff, void* recvbuff, 
 ncclResult_t ncclReduceScatter(const void* sendbuff, void* recvbuff, size_t recvcount,
     ncclDataType_t datatype, ncclRedOp_t op, ncclComm* comm, cudaStream_t stream) {
   struct ncclInfo info = { ncclCollReduceScatter, "ReduceScatter",
-    sendbuff, recvbuff, recvcount, datatype, op, 0, comm, stream, /* Args */
+    sendbuff, recvbuff, NULL, NULL, recvcount, datatype, op, 0, comm, stream, /* Args */
     REDUCESCATTER_CHUNKSTEPS, REDUCESCATTER_SLICESTEPS };
   return ncclEnqueueCheck(&info);
 }

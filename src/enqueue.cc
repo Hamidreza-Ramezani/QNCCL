@@ -366,7 +366,8 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   ///////coll->args.tempbuff2 = info->tempbuff2;
   ///////coll->args.tempbuff3 = info->tempbuff3;
 
-
+  coll->args.random_numbers = info->random_numbers;
+  coll->args.states = info->states;
 
   //char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
   //coll->args.with_compression = false;

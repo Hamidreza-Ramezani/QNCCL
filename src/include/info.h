@@ -32,6 +32,9 @@ struct ncclInfo {
   //////void* tempbuff1;
   //////void* tempbuff2;
   //////void* tempbuff3;
+  float * random_numbers;
+  void * states;
+
   size_t count;
   ncclDataType_t datatype;
   ncclRedOp_t op;
