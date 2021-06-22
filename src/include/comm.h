@@ -61,6 +61,7 @@ struct ncclComm {
 
   ///unsigned char * tempbuff1;
   ///float * tempbuff3;
+  int callIndex;
 
   struct ncclPeerInfo* peerInfo;
   struct ncclTopoSystem* topo;

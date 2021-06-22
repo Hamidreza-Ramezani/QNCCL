@@ -226,6 +226,7 @@ struct ncclDevComm {
   void * tempbuff3;
 
   void * states;
+  void * callIndex;
 
 
   // Flag to ask NCCL kernels to abort

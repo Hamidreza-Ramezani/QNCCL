@@ -54,8 +54,13 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     //}
     //cudaMalloc((void **)&states, 544 * 64 * sizeof(curandState));
     //cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes*bits/32 + meta_size);
-    cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes/4 + meta_size);
-    cudaMemset(comm->hostDevComm.tempbuff3, 0, nbytes);
+    //cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes/4 + meta_size);
+    //cudaMemset(comm->hostDevComm.tempbuff3, 0, nbytes);
+    //comm->hostDevComm.callIndex += 1;
+    int* host_callIndex = (int*)malloc(4);
+    cudaMemcpy(host_callIndex, comm->hostDevComm.callIndex, 1 * sizeof(int), cudaMemcpyDeviceToHost);
+    host_callIndex[0] += 1;
+    cudaMemcpy(comm->hostDevComm.callIndex, host_callIndex, 1 * sizeof(int), cudaMemcpyHostToDevice);
   }
   cudaDeviceSynchronize();
 

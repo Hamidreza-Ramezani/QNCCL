@@ -282,7 +282,10 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
         cudaMalloc((void **)&comm->hostDevComm.states, 544 * 64 * sizeof(curandState));
         cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, INITIAL_SIZE + meta_size);
         cudaMalloc((float**)&comm->hostDevComm.tempbuff3, sizeof(float) * INITIAL_SIZE);
-        cudaDeviceSynchronize();
+        cudaMalloc((int**)&comm->hostDevComm.callIndex, sizeof(int) * 1);
+        //cudaMemset(comm->hostDevComm.callIndex, 0, 1 * sizeof(int));
+        //comm->callIndex = comm->hostDevComm.callIndex = 0;
+        //cudaDeviceSynchronize();
      }
   }
 
