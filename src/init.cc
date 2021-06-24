@@ -225,6 +225,9 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
 
   comm->rank = comm->hostDevComm.rank =rank;
   comm->nRanks = comm->hostDevComm.nRanks = ndev;
+/////////////////////////////////////////////////////////////////
+  //comm->callIndex = comm->hostDevComm.callIndex = 0;
+/////////////////////////////////////////////////////////////////
   cudaGetDevice(&comm->cudaDev);
   NCCLCHECK(getBusId(comm->cudaDev, &comm->busId));
   TRACE(NCCL_INIT,"comm %p rank %d nranks %d cudaDev %d busId %x", comm, rank, ndev, comm->cudaDev, comm->busId);
@@ -282,7 +285,7 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
         cudaMalloc((void **)&comm->hostDevComm.states, 544 * 64 * sizeof(curandState));
         cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, INITIAL_SIZE + meta_size);
         cudaMalloc((float**)&comm->hostDevComm.tempbuff3, sizeof(float) * INITIAL_SIZE);
-        cudaMalloc((int**)&comm->hostDevComm.callIndex, sizeof(int) * 1);
+        //cudaMalloc((int**)&comm->hostDevComm.callIndex, sizeof(int) * 1);
         //cudaMemset(comm->hostDevComm.callIndex, 0, 1 * sizeof(int));
         //comm->callIndex = comm->hostDevComm.callIndex = 0;
         //cudaDeviceSynchronize();

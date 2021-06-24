@@ -381,6 +381,7 @@ static ncclResult_t computeColl(struct ncclInfo* info /* input */, struct ncclCo
   ///////coll->args.states = info->states;
 
 
+  coll->args.callIndex = info->comm->opCount;
   char* ring_allReduce_version = getenv("RING_ALLREDUCE_VERSION");
   coll->args.with_compression = false;
 
@@ -578,6 +579,10 @@ ncclResult_t ncclSaveKernel(struct ncclInfo* info) {
     channel->collCount++;
   }
   info->comm->opCount++;
+///////////////////////////////////////////////////////
+  //info->comm->callIndex++;
+  //info->comm->hostDevComm.callIndex++;
+///////////////////////////////////////////////////////
   return ncclSuccess;
 }
 

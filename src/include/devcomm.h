@@ -148,8 +148,9 @@ struct CollectiveArgs {
   bool with_compression;
   int BITS;
   int bucket_size;
+  int callIndex; 
 
-  int dummy[14];
+  int dummy[13];
   //do_compression:boolean
 
   // Op-specific fields. Make sure the common part stays the
@@ -226,7 +227,8 @@ struct ncclDevComm {
   void * tempbuff3;
 
   void * states;
-  void * callIndex;
+  //void * callIndex;
+  //int callIndex;
 
 
   // Flag to ask NCCL kernels to abort

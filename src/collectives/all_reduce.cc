@@ -56,11 +56,15 @@ ncclResult_t ncclAllReduce(const void* sendbuff, void* recvbuff, size_t count,
     //cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes*bits/32 + meta_size);
     //cudaMemset(comm->hostDevComm.tempbuff1, 0, nbytes/4 + meta_size);
     //cudaMemset(comm->hostDevComm.tempbuff3, 0, nbytes);
-    //comm->hostDevComm.callIndex += 1;
-    int* host_callIndex = (int*)malloc(4);
-    cudaMemcpy(host_callIndex, comm->hostDevComm.callIndex, 1 * sizeof(int), cudaMemcpyDeviceToHost);
-    host_callIndex[0] += 1;
-    cudaMemcpy(comm->hostDevComm.callIndex, host_callIndex, 1 * sizeof(int), cudaMemcpyHostToDevice);
+    //comm->callIndex += 1;
+    //comm->hostDevComm.callIndex = comm->opCount;
+    //comm->callIndex = comm->opCount;
+    //printf("opcount is %d\n", comm->opCount);
+    //printf("opcount is %d\n", comm->collOpCount);
+    //int* host_callIndex = (int*)malloc(4);
+    //cudaMemcpy(host_callIndex, comm->hostDevComm.callIndex, 1 * sizeof(int), cudaMemcpyDeviceToHost);
+    //host_callIndex[0] += 1;
+    //cudaMemcpy(comm->hostDevComm.callIndex, host_callIndex, 1 * sizeof(int), cudaMemcpyHostToDevice);
   }
   cudaDeviceSynchronize();
 

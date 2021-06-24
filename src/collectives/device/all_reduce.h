@@ -72,13 +72,14 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   curandState* devStates = (curandState*)comm->states;
   //curandStatePhilox4_32_10_t* devStates = (curandStatePhilox4_32_10_t*)args->states;
   //curandStateMRG32k3a* devStates = (curandStateMRG32k3a*)args->states;
-  int callIndex = ((int*)comm->callIndex)[0];
+  //int callIndex = comm->callIndex;
+  int callIndex = args->callIndex;
 
   /* Setup prng states */
   setup_kernel(devStates, callIndex);
-  //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) { 
-  //  printf("call index is %d \n", ((int*)comm->callIndex)[0]);
-  //} 
+  //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+  //  printf("call index is %d \n", callIndex);
+  //}
 
 
   if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
