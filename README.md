@@ -82,12 +82,17 @@ QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used 
 ## Example
 Lets train GPT-2 on Wikitext-2 and see how QNCCL improves the latency. We use transformer library of huggingface. The steps are as follows:
 
+   ```
    $ git clone https://github.com/huggingface/transformers
    $ cd transformers
    $ pip install .
    $ cd examples/pytorch/language-modeling/
+   
+   ```
 
 Use the following script in case you like to fine-tune the model: 
+
+  ```
 
   $ nproc_per_node=8
   $ python -m torch.distributed.launch \
@@ -102,9 +107,12 @@ Use the following script in case you like to fine-tune the model:
       --overwrite_output_dir \
       --num_train_epochs 3 \
       --output_dir /tmp/test-clm
+
+   ```
  
 Use the following script in case you like to train the model from scratch:
-
+  
+  ```
   $ nproc_per_node=8
   $ python -m torch.distributed.launch \
       --nproc_per_node=$nproc_per_node run_clm.py \
@@ -119,7 +127,7 @@ Use the following script in case you like to train the model from scratch:
       --num_train_epochs 150 \
       --overwrite_output_dir \
       --output_dir /tmp/test-clm
- 
+ ```
    
 
 #### Caveats
