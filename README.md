@@ -87,6 +87,7 @@ Lets train GPT-2 on Wikitext-2 and see how QNCCL improves the latency. We use tr
    $ cd transformers
    $ pip install .
    $ cd examples/pytorch/language-modeling/
+   $ pip install -r requirements.txt
    
    ```
 
