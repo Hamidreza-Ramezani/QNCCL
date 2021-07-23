@@ -79,6 +79,49 @@ QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used 
     $ export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
     $ USE_SYSTEM_NCCL=1 USE_STATIC_NCCL=0 python setup.py install
 
+## Example
+Lets train GPT-2 on Wikitext-2 and see how QNCCL improves the latency. We use transformer library of huggingface. The steps are as follows:
+
+   $ git clone https://github.com/huggingface/transformers
+   $ cd transformers
+   $ pip install .
+   $ cd examples/pytorch/language-modeling/
+
+Use the following script in case you like to fine-tune the model: 
+
+  $ nproc_per_node=8
+  $ python -m torch.distributed.launch \
+      --nproc_per_node=$nproc_per_node \
+      --master_port 30000  run_clm.py \
+      --model_name_or_path gpt2 \
+      --block_size 256 \
+      --dataset_name wikitext \
+      --dataset_config_name wikitext-2-raw-v1 \
+      --do_train \
+      --do_eval \
+      --overwrite_output_dir \
+      --num_train_epochs 3 \
+      --output_dir /tmp/test-clm
+ 
+Use the following script in case you like to train the model from scratch:
+
+  $ nproc_per_node=8
+  $ python -m torch.distributed.launch \
+      --nproc_per_node=$nproc_per_node run_clm.py \
+      --master_port 30000 \
+      --model_type gpt2 \
+      --tokenizer_name gpt2 \
+      --block_size 256 \
+      --dataset_name wikitext \
+      --dataset_config_name wikitext-2-raw-v1 \
+      --do_train \
+      --do_eval \
+      --num_train_epochs 150 \
+      --overwrite_output_dir \
+      --output_dir /tmp/test-clm
+ 
+   
+
 #### Caveats
 If the architecture of the target platform is `GeForce RTX 3090` , the nightly version of Pytorch needs to be compiled. That version is available in [this](https://github.com/pytorch/pytorch/tree/nightly) branch.  So, the following step must be done after cloning Pytorch:
 
