@@ -1,3 +1,4 @@
+
 # QNCCL
 Communication-Efficient primitives for inter-GPU communication via quantization and encoding
 
@@ -80,21 +81,42 @@ QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used 
     $ USE_SYSTEM_NCCL=1 USE_STATIC_NCCL=0 python setup.py install
 
 ## Example
+
+### ResNet50 on ImageNet
+We used Nvidia's DeepLearningExamples repository for this experiment. The initial steps to clone the repository and install the dependencies is as follows:
+```
+$ git clone https://github.com/NVIDIA/DeepLearningExamples/
+$ git clone https://github.com/NVIDIA/apex
+$ cd apex
+$ pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+$ pip install --extra-index-url https://developer.download.nvidia.com/compute/redist --upgrade nvidia-dali-cuda110
+$ pip install git+https://github.com/NVIDIA/dllogger.git
+```
+The training process can be started using the following script (for 500 steps): 
+```
+$ cd ./DeepLearningExamples/PyTorch/Classification/ConvNets/resnet50v1.5/training/AMP
+$ IMAGENET_PATH=/nvmedisk/Datasets/ILSVRC/Data/CLS-LOC
+$ program= <path-to-DeepLearningExamples-repo>/PyTorch/Classification/ConvNets/multiproc.py
+$ launch= <path-to-DeepLearningExamples-repo>/PyTorch/Classification/ConvNets/launch.py
+$ python $program --nproc_per_node 8 $launch --model resnet50 --precision AMP --mode convergence --platform DGX1V $IMAGENET_PATH --mixup 0.0 --workspace log/ --epochs 1 --prof 500
+```
+
+
+
+### GPT-2 on Wikitext-2
 Lets train GPT-2 on Wikitext-2 and see how QNCCL improves the latency. We use transformer library of huggingface. The steps are as follows:
 
-   ```
+```
    $ git clone https://github.com/huggingface/transformers
    $ cd transformers
    $ pip install .
    $ cd examples/pytorch/language-modeling/
    $ pip install -r requirements.txt
-   
    ```
 
 Use the following script in case you like to fine-tune the model: 
 
-  ```
-
+```
   $ nproc_per_node=8
   $ python -m torch.distributed.launch \
       --nproc_per_node=$nproc_per_node \
@@ -108,12 +130,11 @@ Use the following script in case you like to fine-tune the model:
       --overwrite_output_dir \
       --num_train_epochs 3 \
       --output_dir /tmp/test-clm
-
    ```
  
 Use the following script in case you like to train the model from scratch:
   
-  ```
+```
   $ nproc_per_node=8
   $ python -m torch.distributed.launch \
       --nproc_per_node=$nproc_per_node run_clm.py \
@@ -130,11 +151,6 @@ Use the following script in case you like to train the model from scratch:
       --output_dir /tmp/test-clm
  ```
    
-
-#### Caveats
-If the architecture of the target platform is `GeForce RTX 3090` , the nightly version of Pytorch needs to be compiled. That version is available in [this](https://github.com/pytorch/pytorch/tree/nightly) branch.  So, the following step must be done after cloning Pytorch:
-
-    $ git checkout nightly
 
 
 
