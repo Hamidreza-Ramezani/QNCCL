@@ -17,3 +17,10 @@ Here, we compared the performance of QNCCL and NCCL in executing all-reduce oper
 ![comparing performance of QNCCL and NCCL in executing all-reduce operation](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_3.png)
 
 
+
+In this plot, we compared the performance of QNCCL and NCCL in training RN50 on ImageNet.
+
+![comparing performance of QNCCL and NCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_3.png)
+
+
+
