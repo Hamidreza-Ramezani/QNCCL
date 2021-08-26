@@ -60,12 +60,8 @@ We suggest to set the following environment variables before using QNCCL:
 The above example runs all_reduce on 8 GPUs. The inputs size varies from 4Bytes  to 1GBytes. In each step, the input size is doubled (This is specified by `-f` flag). There is one warm-up iteration (`-n` flag). Each element of the input and output buffers is a single-precision floating point number ( `-d` option). The complete list of arguments can be found [here](https://github.com/nvidia/nccl-tests#arguments). 
 
 
-## Results
 
-Our results show that QNCCL is ~4x faster than NCCL in applying `all_reduce` on large buffers (bigger than 100MBytes). So, it is suggested to use QNCCL for applications in which the buffers need to be reduced are big enough, though our implementation has gain for all buffers of size > 1MBytes. 
-
-
-## Machine learning experiments
+## Build Pytorch from source
 QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used as the communication back-end in distributed training. To do so, Pytorch has to be compiled from source. The steps for building Pytorch from source and linking it to QNCCL is as follows: 
 
     $ export NCCL_ROOT=<path_to_QNCCL>
@@ -160,6 +156,58 @@ Use the following script in case you like to train the model from scratch:
       --output_dir /tmp/test-clm
  ```
    
+## Results
+
+Our results show that QNCCL is ~4x faster than NCCL in applying `all_reduce` on large buffers (bigger than 100MBytes). So, it is suggested to use QNCCL for applications in which the buffers need to be reduced are big enough, though our implementation has gain for all buffers of size > 1MBytes. 
+
+
+## Plots
+
+In the following figures, we compare the performance of QNCCL with NCCL: 
+
+In the first figure, we compared the performance of QNCCL and NCCL in training GPT-2 on Wikitext for one epoch while changing the number of GPUs. 
+
+![comparing performance of QNCCL and NCCL in training GPT-2 on Wikitext for one epoch while changing the number of GPUs](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_1.png)
+
+
+
+In this plot, we compared the (loss, time) of QNCCL and NCCL in training GPT-2 on Wikitext.
+
+![comparing performance of QNCCL and NCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_6.png)
+
+
+
+In this graph, we compared the performance of QNCCL and NCCL in training BERT on MRPC for one epoch while changing the number of GPUs. 
+
+![comparing performance of QNCCL and NCCL in training BERT on MRPC for one epoch while changing the number of GPUs](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_2.png)
+
+
+
+Here, we compared the performance of QNCCL and NCCL in executing all-reduce operation. 
+
+![comparing performance of QNCCL and NCCL in executing all-reduce operation](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_3.png)
+
+
+
+In this plot, we compared the (loss, time) of QNCCL and NCCL in training RN50 on ImageNet.
+
+![comparing performance of QNCCL and NCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_4.png)
+
+
+
+In this figure, we compared the (accuracy, time) of QNCCL and NCCL in training RN50 on ImageNet.
+
+![comparing (accuracy, time) of QNCCL and NCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_5.png)
+
+
+
+
+In this graph, we measured the speedup of QNCCL in training RN50 on ImageNet for one epoch while changing the number of GPUs.
+
+![Speedup of QNCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_7.png)
+
+
+
 
 
 
