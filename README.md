@@ -80,6 +80,15 @@ QNCCL can be linked to [Pytorch](https://github.com/pytorch/pytorch) to be used 
     $ export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}
     $ USE_SYSTEM_NCCL=1 USE_STATIC_NCCL=0 python setup.py install
 
+
+## Build torch vision from source
+To use Pytorch which is linked to a custom NCCL, one needs to compile torch vision from source as well. 
+
+    $ git clone https://github.com/pytorch/vision
+    $ cd vision
+    $ python setup.py install
+
+
 ## Example
 
 ### ResNet50 on ImageNet
