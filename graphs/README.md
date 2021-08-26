@@ -6,6 +6,13 @@ In the first figure, we compared the performance of QNCCL and NCCL in training G
 ![comparing performance of QNCCL and NCCL in training GPT-2 on Wikitext for one epoch while changing the number of GPUs](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_1.png)
 
 
+
+In this plot, we compared the (loss, time) of QNCCL and NCCL training GPT-2 on Wikitext.
+
+![comparing performance of QNCCL and NCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_6.png)
+
+
+
 In this graph, we compared the performance of QNCCL and NCCL in training BERT on MRPC for one epoch while changing the number of GPUs. 
 
 ![comparing performance of QNCCL and NCCL in training BERT on MRPC for one epoch while changing the number of GPUs](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_2.png)
@@ -18,9 +25,21 @@ Here, we compared the performance of QNCCL and NCCL in executing all-reduce oper
 
 
 
-In this plot, we compared the performance of QNCCL and NCCL in training RN50 on ImageNet.
+In this plot, we compared the (loss, time) of QNCCL and NCCL in training RN50 on ImageNet.
 
 ![comparing performance of QNCCL and NCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_4.png)
 
+
+
+In this figure, we compared the (accuracy, time) of QNCCL and NCCL in training RN50 on ImageNet.
+
+![comparing (accuracy, time) of QNCCL and NCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_5.png)
+
+
+
+
+In this graph, we measured the speedup of QNCCL in training RN50 on ImageNet while changing the number of GPUs.
+
+![Speedup of QNCCL in training RN50 on ImageNet](https://github.com/hamid-ramezani/QNCCL/blob/stochastic_quant/graphs/Figure_7.png)
 
 
