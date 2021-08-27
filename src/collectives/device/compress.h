@@ -310,20 +310,131 @@ inline __device__ void dequantize(unsigned char* input_data, float* output, int 
 }
 
 
+inline __device__ void find_meta_seq(const half* input, half* meta, int num_elem, int bucket_size, int bits) {
+  int index = threadIdx.x;
+  int stride = blockDim.x -32;
 
-
-inline __device__ void quantize(half* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
-  int tid = threadIdx.x;
-  for (int idx = tid; idx < num_elems; idx += blockDim.x) {
-    output_data[idx] = static_cast<unsigned char>(__half2uint_rd(input_data[idx]));
+  if (threadIdx.x < blockDim.x-32) {
+     const int divisor = (1 << bits) - 1;
+     half* meta_buf = (half*)meta;
+     for (int i = index; i < (num_elem + bucket_size - 1) / bucket_size; i += stride) {
+       half mmin = input[i * bucket_size];
+       half mmax = input[i * bucket_size];
+       for (int j = i * bucket_size + 1; j < fminf((i + 1) * bucket_size, num_elem); j++) {
+         mmin = __hmin(mmin, input[j]);
+         mmax = __hmax(mmax, input[j]);
+       }
+       meta_buf[2 * i] =   __hdiv(__hsub(mmax, mmin), __uint2half_rd(divisor));
+       meta_buf[2 * i + 1] = mmin;
+     }
   }
+  __syncthreads();
 }
 
 
-inline __device__ void dequantize(unsigned char* input_data, half* output, int num_elems, int bucket_size, int bits) {
-  const int tid = threadIdx.x;
-  for (int idx = tid; idx < num_elems; idx += blockDim.x) {
-    output[idx] = static_cast<half>(input_data[idx]);
+
+inline __device__ unsigned char
+MaxMinEncodeValue(half input, half* meta_info, float rand) {
+  half* maxmin = ((half*)meta_info);
+  float min =  __half2float(maxmin[1]);
+  float unit = __half2float(maxmin[0]);
+  if (unit < EPS) {
+    return 0;
   }
+  float input_f = __half2float(input);
+  float d = (input_f - min) / unit + rand;
+  unsigned char level = floor(d);
+  return level;
+}
+
+
+inline __device__ void CompressBucket(half* input, unsigned char* output, half* meta_info, int num_elems, int bits, curandState* states) {
+  using int64_t = long long int;
+  int tid = threadIdx.x;
+  int num_threads = blockDim.x-32;
+  if (tid>=num_threads) return;
+  float rand;
+  int num_char = (bits * num_elems + PACK_SIZE - 1) / PACK_SIZE;
+  curandState state = states[tid + blockIdx.x * blockDim.x];
+  for (int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += num_threads) {
+      int64_t value = 0;
+      for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
+        int idx = i * PACK_SIZE + j;
+        //rand = 0.5;
+        //rand = get_rand(states);
+        rand = curand_uniform(&state);
+        //int sidx = floor(rand / 0.25);
+        //stats[sidx]++;
+        int64_t encoded = MaxMinEncodeValue(input[idx], meta_info, rand);
+        value += (encoded << (j * bits));
+      }
+      for (int j = 0; j < bits && i * bits + j < num_char; j++) {
+        output[i * bits + j] = value >> (PACK_SIZE * j) & 0xFF;
+      }
+  }
+  states[tid + blockIdx.x * blockDim.x] = state;
+}
+
+
+inline __device__ void quantize(half* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
+  int num_blocks = 1;
+  int bid = 0;
+  int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
+  int cur_bucket_size;
+  half* meta = (half*)output_data;
+  unsigned char* output;
+  const int meta_multiplier = 2;
+  output = output_data + meta_multiplier * sizeof(half) * num_buckets;
+  int compressed_size = (bucket_size * bits + PACK_SIZE - 1) / PACK_SIZE;
+  half* input = (half*)input_data;
+  find_meta_seq(input, meta, num_elems, bucket_size, bits);
+  for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
+    cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
+    CompressBucket(
+        input + bucket_size * bucket_id, output + compressed_size * bucket_id,
+        (meta + meta_multiplier * bucket_id),
+        cur_bucket_size, bits, states);
+  }
+  __syncthreads();
+}
+
+inline __device__ half MaxMinDecodeValue(unsigned char input, half* meta_info, int idx, int bucket_size) {
+  int bucket_no = idx / bucket_size;
+  half* maxmin = ((half*)meta_info) + 2 * bucket_no;
+  half min = maxmin[1];
+  half unit = maxmin[0];
+  return __hadd(min, (__hmul(unit, __uint2half_rd((int)input))));
+}
+
+inline __device__ void dequantize(unsigned char* input_data, half* output, int num_elems, int bucket_size, int bits) {
+  int tid = threadIdx.x;
+  int stride = blockDim.x -32;
+
+  if (threadIdx.x<blockDim.x -32) {
+    int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
+    half* meta_info = (half*)input_data;
+    unsigned char* input;
+    const int meta_multiplier = 2;
+    input = input_data + meta_multiplier * sizeof(half) * num_buckets;
+
+    int num_char = (bits * num_elems + PACK_SIZE - 1) / PACK_SIZE;
+    int divisor = 1 << bits;
+    for (int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += stride) {
+      int64_t value = 0;
+      for (int j = 0; j < bits && i * bits + j < num_char; j++) {
+        value |= ((int64_t)input[i * bits + j]) << (j * PACK_SIZE);
+      }
+      for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
+        unsigned char encoded_value = (value >> (j * bits)) & (divisor - 1);
+        half d = MaxMinDecodeValue(encoded_value, meta_info, i * PACK_SIZE + j, bucket_size);
+        //if (ADD) {
+        //  output[i * PACK_SIZE + j] = output[i * PACK_SIZE + j] + d;
+        //} else {
+          output[i * PACK_SIZE + j] = d;
+        //}
+      }
+    }
+  }
+  __syncthreads();
 }
 
