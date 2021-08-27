@@ -284,6 +284,7 @@ static ncclResult_t devCommSetup(ncclComm_t comm) {
         int meta_size = 2 * sizeof(float) * num_buckets;
         cudaMalloc((void **)&comm->hostDevComm.states, 544 * 64 * sizeof(curandState));
         cudaMalloc((unsigned char**)&comm->hostDevComm.tempbuff1, INITIAL_SIZE + meta_size);
+        //cudaMalloc((half**)&comm->hostDevComm.tempbuff1, sizeof(half) * INITIAL_SIZE);
         cudaMalloc((float**)&comm->hostDevComm.tempbuff3, sizeof(float) * INITIAL_SIZE);
         //cudaMalloc((int**)&comm->hostDevComm.callIndex, sizeof(int) * 1);
         //cudaMemset(comm->hostDevComm.callIndex, 0, 1 * sizeof(int));
