@@ -2,6 +2,7 @@
 #include "cuda.h"
 #include <stdint.h>
 #include <curand_kernel.h>
+#include <cuda_fp16.h>
 
 #define PACK_SIZE 8
 #define EPS 1e-10
@@ -263,45 +264,6 @@ inline __device__ void quantize(float* input_data, unsigned char* output_data, i
 }
 
 
-inline __device__ void quantize(const float* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
-  //int num_blocks = gridDim.x;
-  //int bid = blockIdx.x;
-  //if (num_elems < 0) { 
-  //  return;
-  //}
-  int num_blocks = 1;
-  int bid = 0;
-
-  int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
-  int cur_bucket_size;
-  float* meta = (float*)output_data;
-  unsigned char* output;
-  const int meta_multiplier = 2;
-  output = output_data + meta_multiplier * sizeof(float) * num_buckets;
-
-  int compressed_size = (bucket_size * bits + PACK_SIZE - 1) / PACK_SIZE;
-
-  float* input = (float*)input_data;
-  find_meta_seq(input, meta, num_elems, bucket_size, bits);
-  //for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
-  //  cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-  //  find_meta_parallel(input + bucket_size * bucket_id, (meta + meta_multiplier * bucket_id), cur_bucket_size, bits);
-  //}
-  //int stats[4] = {};
-  for (int bucket_id = bid; bucket_id < num_buckets; bucket_id += num_blocks) {
-    cur_bucket_size = umin(bucket_size, num_elems - bucket_id * bucket_size);
-    CompressBucket(
-        input + bucket_size * bucket_id, output + compressed_size * bucket_id,
-        (meta + meta_multiplier * bucket_id),
-        cur_bucket_size, bits, states);
-  }
-  //if (threadIdx.x == 0 && blockIdx.x == 0 && gpuId == 0) {
-  //	for (int i = 0; i < 4; i++)
-  //	  printf("%i ", stats[i]);
-  //	printf("\n");
-  //}
-  __syncthreads();
-}
 
 
 inline __device__ float MaxMinDecodeValue(unsigned char input, float* meta_info, int idx, int bucket_size) {
@@ -350,34 +312,18 @@ inline __device__ void dequantize(unsigned char* input_data, float* output, int 
 
 
 
-//template <bool ADD>
-//inline __device__ void dequantize(unsigned char* input_data, float* output, int num_elems, int bucket_size, int bits) {
-//  //if (num_elems < 0) {
-//  //  num_elems = 0;
-//  //}
-//  int tid = threadIdx.x;
-//  int stride = blockDim.x-32;
-//  int num_buckets = (num_elems + bucket_size - 1) / bucket_size;
-//  float* meta_info = (float*)input_data;
-//  unsigned char* input; 
-//  const int meta_multiplier = 2;
-//  input = input_data + meta_multiplier * sizeof(float) * num_buckets;
-//  
-//  int num_char = (bits * num_elems + PACK_SIZE - 1) / PACK_SIZE;
-//  int divisor = 1 << bits;
-//  for (int i = tid; i < (num_elems + PACK_SIZE - 1) / PACK_SIZE; i += stride) {
-//    int64_t value = 0;
-//    for (int j = 0; j < bits && i * bits + j < num_char; j++) {
-//      value |= ((int64_t)input[i * bits + j]) << (j * PACK_SIZE);
-//    }
-//    for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
-//      unsigned char encoded_value = (value >> (j * bits)) & (divisor - 1);
-//      float d = MaxMinDecodeValue(encoded_value, meta_info, i * PACK_SIZE + j, bucket_size);
-//      if (ADD) {
-//        output[i * PACK_SIZE + j] = output[i * PACK_SIZE + j] + d;
-//      } else {
-//        output[i * PACK_SIZE + j] = d;
-//      }
-//    }
-//  }
-//}
+inline __device__ void quantize(half* input_data, unsigned char* output_data, int num_elems, int bucket_size, int bits, curandState* states) {
+  int tid = threadIdx.x;
+  for (int idx = tid; idx < num_elems; idx += blockDim.x) {
+    output_data[idx] = static_cast<unsigned char>(__half2uint_rd(input_data[idx]));
+  }
+}
+
+
+inline __device__ void dequantize(unsigned char* input_data, half* output, int num_elems, int bucket_size, int bits) {
+  const int tid = threadIdx.x;
+  for (int idx = tid; idx < num_elems; idx += blockDim.x) {
+    output[idx] = static_cast<half>(input_data[idx]);
+  }
+}
+

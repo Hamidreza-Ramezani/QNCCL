@@ -65,7 +65,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   //}
 
 
-  if (std::is_same<T, float>::value && std::is_same<FUNC, FuncSum<float>>::value) {
+  if (std::is_same<T, float>::value) {
     //const int BITS=8;
     const int BITS=args->BITS;
     const float * __restrict__ thisInput = (const float*)args->sendbuff;
@@ -119,7 +119,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
 
       //compress(thisInput+offset, compressed_temp+offset, nelem, args->coll.nThreads);
       //setup_kernel(devStates);
-      quantize(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+      quantize((float*)thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
 
       //__syncthreads();
       //if(tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 1) {
@@ -353,13 +353,17 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
     }
   }
   
-   else if (std::is_same<T, half>::value && std::is_same<FUNC, FuncSum<half>>::value) {
+   else if (std::is_same<T, half>::value) {
 
      const half * __restrict__ thisInput = (const half*)args->sendbuff;
      half * __restrict__ thisOutput = (half*)args->recvbuff;
+     const int BITS=args->BITS;
 
-     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, half, 1, 1, 1, FuncSum<half>>
-       prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+     //ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, half, 1, 1, 1, FuncSum<half>>
+     //  prims(tid, nthreads, &ring->prev, &ring->next, thisOutput, stepSize, channel, comm);
+
+     ncclPrimitives<UNROLL, ALLREDUCE_CHUNKSTEPS/ALLREDUCE_SLICESTEPS, ALLREDUCE_SLICESTEPS, unsigned char, 1, 1, 1, FuncSum<unsigned char>>
+       prims(tid, nthreads, &ring->prev, &ring->next, (unsigned char*)thisOutput, stepSize*2, channel, comm);
 
      for (ssize_t gridOffset = 0; gridOffset < size; gridOffset += nranks*loopSize) {
        ssize_t realChunkSize = min(chunkSize, DIVUP(size-gridOffset,nranks*nChannels));
@@ -376,7 +380,8 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        offset = chunkOffset + chunk * realChunkSize;
        nelem = min(realChunkSize, size-offset);
 
-       half* __restrict__ compressed_temp = (half*)comm->tempbuff1;
+       unsigned char* __restrict__ compressed_temp = (unsigned char*)comm->tempbuff1;
+       quantize((half*)thisInput+offset, compressed_temp+offset, nelem, bucket_size, BITS, devStates);
 
        //if(tid == 0 && blockIdx.x == 0) {
        //   printf("in the place 1\n");
@@ -387,16 +392,23 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        //}
        //__syncthreads();
 
-       prims.send(thisInput+offset, nelem);
+       prims.send(compressed_temp+offset, nelem);
+       //prims.send(thisInput+offset, nelem);
+       // k-2 steps: reduce and copy to next GPU
        for (int j=2; j<nranks; ++j) {
          chunk = ring->devUserRanks[nranks-j];
          offset = chunkOffset + chunk * realChunkSize;
          nelem = min(realChunkSize, size-offset);
          
+         unsigned char* __restrict__ compressed_temp = (unsigned char*)comm->tempbuff1;
+         half * __restrict__ decompressed_temp = (half*)comm->tempbuff3;
          prims.recv(compressed_temp+offset, nelem);
+         dequantize(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, BITS);
          for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-           compressed_temp[idx] = compressed_temp[idx] + thisInput[idx];
+           //compressed_temp[idx] = compressed_temp[idx] + thisInput[idx];
+           decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
          }
+         quantize(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, BITS, devStates);
          prims.send(compressed_temp+offset, nelem);
          //prims.recvReduceSend(thisInput+offset, nelem);
        }
@@ -406,12 +418,19 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        chunk = ring->devUserRanks[0];
        offset = chunkOffset + chunk * realChunkSize;
        nelem = min(realChunkSize, size-offset);
+       half * __restrict__ decompressed_temp = (half*)comm->tempbuff3;
 
        prims.directRecv(compressed_temp+offset, offset, nelem);
+       dequantize(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, BITS);
        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
-         compressed_temp[idx] = compressed_temp[idx] + thisInput[idx];
+         //compressed_temp[idx] = compressed_temp[idx] + thisInput[idx];
+         decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
        }
-       prims.copySend(compressed_temp+offset, thisOutput+offset, nelem);
+
+       quantize(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, BITS, devStates);
+       dequantize(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, BITS);
+       prims.send(compressed_temp+offset, nelem);
+       //prims.copySend(compressed_temp+offset, thisOutput+offset, nelem);
 
        //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
 
@@ -431,7 +450,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
          //}
          //__syncthreads();
 
-         prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+         prims.directRecvCopySend(compressed_temp+offset, offset, nelem);
+         //prims.directRecvCopySend(thisOutput+offset, offset, nelem);
+         dequantize(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, BITS);    
        }
 
        // Make final copy from buffer to dest.
@@ -450,7 +471,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        //__syncthreads();
 
        // Final wait/copy.
-       prims.directRecv(thisOutput+offset, offset, nelem);
+       prims.directRecv(compressed_temp+offset, offset, nelem);
+       dequantize(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, BITS);
+       //prims.directRecv(thisOutput+offset, offset, nelem);
     }
 
   } else {
@@ -774,7 +797,7 @@ __device__ void ncclAllReduceTreeKernel(struct CollectiveArgs* args) {
           dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
         } else if (tree->down[0] == -1) {
           //prims.send(thisInput+offset, nelem);
-          quantize(thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+          quantize((float*)thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
           prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
 
         } else {
