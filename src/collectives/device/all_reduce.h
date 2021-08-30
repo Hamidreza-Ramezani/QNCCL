@@ -354,6 +354,9 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   
    else if (std::is_same<T, half>::value) {
 
+     //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
+     //  printf("FP16 is used \n");
+     //}
      const half * __restrict__ thisInput = (const half*)args->sendbuff;
      half * __restrict__ thisOutput = (half*)args->recvbuff;
      const int BITS=args->BITS;

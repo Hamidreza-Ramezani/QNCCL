@@ -301,11 +301,7 @@ inline __device__ void dequantize(unsigned char* input_data, float* output, int 
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
         unsigned char encoded_value = (value >> (j * bits)) & (divisor - 1);
         float d = MaxMinDecodeValue(encoded_value, meta_info, i * PACK_SIZE + j, bucket_size);
-        //if (ADD) {
-        //  output[i * PACK_SIZE + j] = output[i * PACK_SIZE + j] + d;
-        //} else {
-          output[i * PACK_SIZE + j] = d;
-        //}
+        output[i * PACK_SIZE + j] = d;
       }
     }
   }
@@ -339,14 +335,14 @@ inline __device__ void find_meta_seq(const half* input, half* meta, int num_elem
 inline __device__ unsigned char
 MaxMinEncodeValue(half input, half* meta_info, float rand) {
   half* maxmin = ((half*)meta_info);
-  float min =  __half2float(maxmin[1]);
-  float unit = __half2float(maxmin[0]);
-  if (unit < EPS) {
+  half min =  maxmin[1];
+  half unit = maxmin[0];
+  if (__half2float(maxmin[0]) < EPS) {
     return 0;
   }
-  float input_f = __half2float(input);
-  float d = (input_f - min) / unit + rand;
-  unsigned char level = floor(d);
+  half rand_fp16 = __float2half(rand);
+  half d = __hadd(__hdiv(__hsub(input, min), unit), rand_fp16);
+  unsigned char level = __half2uint_rd(d);
   return level;
 }
 
@@ -427,11 +423,7 @@ inline __device__ void dequantize(unsigned char* input_data, half* output, int n
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
         unsigned char encoded_value = (value >> (j * bits)) & (divisor - 1);
         half d = MaxMinDecodeValue(encoded_value, meta_info, i * PACK_SIZE + j, bucket_size);
-        //if (ADD) {
-        //  output[i * PACK_SIZE + j] = output[i * PACK_SIZE + j] + d;
-        //} else {
-          output[i * PACK_SIZE + j] = d;
-        //}
+        output[i * PACK_SIZE + j] = d;
       }
     }
   }
