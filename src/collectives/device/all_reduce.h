@@ -85,7 +85,6 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
       int nelem;
       int chunk;
       int nelem_compressed;
-
       ssize_t compressed_offset;
 
       //step 0: push data to next GPU
@@ -374,14 +373,21 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        ssize_t offset;
        int nelem;
        int chunk;
+       int nelem_compressed;
+       ssize_t compressed_offset;
 
        // step 0: push data to next GPU
        chunk = ring->devUserRanks[nranks-1];
        offset = chunkOffset + chunk * realChunkSize;
        nelem = min(realChunkSize, size-offset);
+       int num_buckets = DIVUP(nelem, bucket_size);
+       size_t meta_size = 2 * sizeof(half) * num_buckets;
+       int pre_num_buckets = DIVUP(offset, bucket_size);
+       size_t pre_meta_size = 2 * sizeof(half) * pre_num_buckets;
+       compressed_offset = offset+pre_meta_size;
 
        unsigned char* __restrict__ compressed_temp = (unsigned char*)comm->tempbuff1;
-       quantize((half*)thisInput+offset, compressed_temp+offset, nelem, bucket_size, BITS, devStates);
+       quantize((half*)thisInput+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
 
        //if(tid == 0 && blockIdx.x == 0) {
        //   printf("in the place 1\n");
@@ -392,24 +398,32 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        //}
        //__syncthreads();
 
-       prims.send(compressed_temp+offset, nelem);
+       nelem_compressed = DIVUP(nelem, 8/BITS);
+       prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
        //prims.send(thisInput+offset, nelem);
        // k-2 steps: reduce and copy to next GPU
        for (int j=2; j<nranks; ++j) {
          chunk = ring->devUserRanks[nranks-j];
          offset = chunkOffset + chunk * realChunkSize;
          nelem = min(realChunkSize, size-offset);
+         num_buckets = DIVUP(nelem, bucket_size);
+         meta_size = 2 * sizeof(half) * num_buckets;   
+         int pre_num_buckets = DIVUP(offset, bucket_size);
+         size_t pre_meta_size = 2 * sizeof(half) * pre_num_buckets;
+         compressed_offset = offset+pre_meta_size;
          
          unsigned char* __restrict__ compressed_temp = (unsigned char*)comm->tempbuff1;
          half * __restrict__ decompressed_temp = (half*)comm->tempbuff3;
-         prims.recv(compressed_temp+offset, nelem);
-         dequantize(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, BITS);
+         nelem_compressed = DIVUP(nelem, 8/BITS);
+         prims.recv(compressed_temp+compressed_offset, nelem_compressed+meta_size);
+         dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
          for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
            //compressed_temp[idx] = compressed_temp[idx] + thisInput[idx];
            decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
          }
-         quantize(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, BITS, devStates);
-         prims.send(compressed_temp+offset, nelem);
+         quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+         nelem_compressed = DIVUP(nelem, 8/BITS);
+         prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
          //prims.recvReduceSend(thisInput+offset, nelem);
        }
 
@@ -418,18 +432,27 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        chunk = ring->devUserRanks[0];
        offset = chunkOffset + chunk * realChunkSize;
        nelem = min(realChunkSize, size-offset);
+
+       num_buckets = DIVUP(nelem, bucket_size);
+       meta_size = 2 * sizeof(half) * num_buckets;   
+       pre_num_buckets = DIVUP(offset, bucket_size);
+       pre_meta_size = 2 * sizeof(half) * pre_num_buckets;
+       compressed_offset = offset+pre_meta_size;
+
        half * __restrict__ decompressed_temp = (half*)comm->tempbuff3;
 
-       prims.directRecv(compressed_temp+offset, offset, nelem);
-       dequantize(compressed_temp+offset, decompressed_temp+offset, nelem, bucket_size, BITS);
+       nelem_compressed = DIVUP(nelem, 8/BITS);
+       prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
+       dequantize(compressed_temp+compressed_offset, decompressed_temp+offset, nelem, bucket_size, BITS);
        for (int idx=offset+tid; idx<offset+nelem; idx += args->coll.nThreads) {
          //compressed_temp[idx] = compressed_temp[idx] + thisInput[idx];
          decompressed_temp[idx] = decompressed_temp[idx] + thisInput[idx];
        }
 
-       quantize(decompressed_temp+offset, compressed_temp+offset, nelem, bucket_size, BITS, devStates);
-       dequantize(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, BITS);
-       prims.send(compressed_temp+offset, nelem);
+       quantize(decompressed_temp+offset, compressed_temp+compressed_offset, nelem, bucket_size, BITS, devStates);
+       dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
+       nelem_compressed = DIVUP(nelem, 8/BITS);
+       prims.send(compressed_temp+compressed_offset, nelem_compressed+meta_size);
        //prims.copySend(compressed_temp+offset, thisOutput+offset, nelem);
 
        //prims.directRecvReduceCopySend(thisInput+offset, thisOutput+offset, offset, nelem);
@@ -440,19 +463,17 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
          offset = chunkOffset + chunk * realChunkSize;
          nelem = min(realChunkSize, size-offset);
 
+         num_buckets = DIVUP(nelem, bucket_size);
+         meta_size = 2 * sizeof(half) * num_buckets;   
+         int pre_num_buckets = DIVUP(offset, bucket_size);
+         size_t pre_meta_size = 2 * sizeof(half) * pre_num_buckets;
+         compressed_offset = offset+pre_meta_size;
 
-         //if(tid == 0 && blockIdx.x == 0) {
-         //   printf("in the place 4 and j %d\n", j);
-         //   printf("in device:%d\n", ring->devUserRanks[0]);
-         //   printf("offset is %d\n", offset);
-         //   printf("nelem is %d\n", nelem);
-         //   printf("\n\n\n");
-         //}
-         //__syncthreads();
 
-         prims.directRecvCopySend(compressed_temp+offset, offset, nelem);
+         nelem_compressed = DIVUP(nelem, 8/BITS);
+         prims.directRecvCopySend(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
          //prims.directRecvCopySend(thisOutput+offset, offset, nelem);
-         dequantize(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, BITS);    
+         dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);    
        }
 
        // Make final copy from buffer to dest.
@@ -460,19 +481,16 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
        offset = chunkOffset + chunk * realChunkSize;
        nelem = min(realChunkSize, size-offset);
 
-
-       //if(tid == 0 && blockIdx.x == 0) {
-       //   printf("in the place 3\n");
-       //   printf("in device:%d\n", ring->devUserRanks[0]);
-       //   printf("offset is %d\n", offset);
-       //   printf("nelem is %d\n", nelem);
-       //   printf("\n\n\n");
-       //}
-       //__syncthreads();
+       num_buckets = DIVUP(nelem, bucket_size);
+       meta_size = 2 * sizeof(half) * num_buckets;   
+       pre_num_buckets = DIVUP(offset, bucket_size);
+       pre_meta_size = 2 * sizeof(half) * pre_num_buckets;
+       compressed_offset = offset+pre_meta_size;
 
        // Final wait/copy.
-       prims.directRecv(compressed_temp+offset, offset, nelem);
-       dequantize(compressed_temp+offset, thisOutput+offset, nelem, bucket_size, BITS);
+       nelem_compressed = DIVUP(nelem, 8/BITS);
+       prims.directRecv(compressed_temp+compressed_offset, compressed_offset, nelem_compressed+meta_size);
+       dequantize(compressed_temp+compressed_offset, thisOutput+offset, nelem, bucket_size, BITS);
        //prims.directRecv(thisOutput+offset, offset, nelem);
     }
 

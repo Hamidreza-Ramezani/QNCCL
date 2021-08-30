@@ -16,6 +16,9 @@
   }                                                 \
 } while(0)
 
+inline __device__ __half hmax(__half a, __half b) { return __hge(a, b) ? a : b; }
+
+inline __device__ __half hmin(__half a, __half b) { return __hge(a, b) ? b : a; }
 
 template<typename T>
 __device__ T* compress(T* src, T* compressedSrc, int nelem) {
@@ -321,8 +324,8 @@ inline __device__ void find_meta_seq(const half* input, half* meta, int num_elem
        half mmin = input[i * bucket_size];
        half mmax = input[i * bucket_size];
        for (int j = i * bucket_size + 1; j < fminf((i + 1) * bucket_size, num_elem); j++) {
-         mmin = __hmin(mmin, input[j]);
-         mmax = __hmax(mmax, input[j]);
+         mmin = hmin(mmin, input[j]);
+         mmax = hmax(mmax, input[j]);
        }
        meta_buf[2 * i] =   __hdiv(__hsub(mmax, mmin), __uint2half_rd(divisor));
        meta_buf[2 * i + 1] = mmin;
@@ -361,10 +364,7 @@ inline __device__ void CompressBucket(half* input, unsigned char* output, half* 
       for (int j = 0; j < PACK_SIZE && i * PACK_SIZE + j < num_elems; j++) {
         int idx = i * PACK_SIZE + j;
         //rand = 0.5;
-        //rand = get_rand(states);
         rand = curand_uniform(&state);
-        //int sidx = floor(rand / 0.25);
-        //stats[sidx]++;
         int64_t encoded = MaxMinEncodeValue(input[idx], meta_info, rand);
         value += (encoded << (j * bits));
       }
