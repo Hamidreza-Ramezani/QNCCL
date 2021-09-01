@@ -61,7 +61,7 @@ __device__ void ncclAllReduceRingKernel_new(struct CollectiveArgs* args) {
   /* Setup prng states */
   setup_kernel(devStates, callIndex);
   //if (tid == 0 && blockIdx.x == 0 && ring->devUserRanks[0] == 0) {
-  //  printf("call index is %d \n", callIndex);
+  //  printf("FP32 is called \n");
   //}
 
 
