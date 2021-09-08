@@ -38,12 +38,13 @@ CUDA11_PTX    = -gencode=arch=compute_80,code=compute_80
 
 # Include Ampere support if we're using CUDA11 or above
 ifeq ($(shell test "0$(CUDA_MAJOR)" -ge 11; echo $$?),0)
-  NVCC_GENCODE ?= $(CUDA8_GENCODE) $(CUDA9_GENCODE) $(CUDA9_PTX) $(CUDA11_GENCODE) $(CUDA11_PTX)
+  NVCC_GENCODE ?= $(CUDA9_GENCODE) $(CUDA9_PTX) $(CUDA11_GENCODE) $(CUDA11_PTX)
+  #NVCC_GENCODE ?= $(CUDA8_GENCODE) $(CUDA9_GENCODE) $(CUDA9_PTX) $(CUDA11_GENCODE) $(CUDA11_PTX)
 # Include Volta support if we're using CUDA9 or above
-else ifeq ($(shell test "0$(CUDA_MAJOR)" -ge 9; echo $$?),0)
-  NVCC_GENCODE ?= $(CUDA8_GENCODE) $(CUDA9_GENCODE) $(CUDA9_PTX)
-else
-  NVCC_GENCODE ?= $(CUDA8_GENCODE) $(CUDA8_PTX)
+#else ifeq ($(shell test "0$(CUDA_MAJOR)" -ge 9; echo $$?),0)
+#  NVCC_GENCODE ?= $(CUDA8_GENCODE) $(CUDA9_GENCODE) $(CUDA9_PTX)
+#else
+#  NVCC_GENCODE ?= $(CUDA8_GENCODE) $(CUDA8_PTX)
 endif
 #$(info NVCC_GENCODE is ${NVCC_GENCODE})
 

@@ -8,6 +8,9 @@ make clean
 #export NCCL_DEBUG_SUBSYS
 
 #export CUDA_HOME=/mnt/nfs/clustersw/shared/cuda/10.1.243
-export CUDA_HOME=/mnt/nfs/clustersw/shared/cuda/11.2.0
+export CUDA_HOME=/mnt/nfs/clustersw/shared/cuda/11.2
 
-make -j src.build NVCC_GENCODE="-gencode=arch=compute_80,code=sm_80"
+#make -j src.build NVCC_GENCODE="-gencode=arch=compute_80,code=sm_80"
+make -j src.build 
+
+
